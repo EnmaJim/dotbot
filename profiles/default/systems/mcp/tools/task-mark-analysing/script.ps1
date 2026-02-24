@@ -87,7 +87,7 @@ function Invoke-TaskMarkAnalysing {
     # Read task content
     $taskContent = Get-Content -Path $taskFile.FullName -Raw | ConvertFrom-Json
 
-    # Update task properties (older task files may not have all fields yet)
+    # Update task properties
     Set-OrAddProperty -Object $taskContent -Name 'status' -Value 'analysing'
     Set-OrAddProperty -Object $taskContent -Name 'updated_at' -Value ((Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
 
