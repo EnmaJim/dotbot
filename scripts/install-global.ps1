@@ -180,7 +180,7 @@ function Invoke-Status {
         }
         if (Test-Path $uiDir) {
             Write-Host "    UI:       " -NoNewline -ForegroundColor Yellow
-            Write-Host "✓ Available (port 8686)" -ForegroundColor Green
+            Write-Host "✓ Available (default port 8686)" -ForegroundColor Green
         }
         if (Test-Path $promptsDir) {
             $agentCount = (Get-ChildItem -Path (Join-Path $promptsDir "agents") -Directory -ErrorAction SilentlyContinue).Count

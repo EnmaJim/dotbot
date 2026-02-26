@@ -27,8 +27,9 @@ pwsh tests/Run-Tests.ps1 -Layer 4       # E2E (requires ANTHROPIC_API_KEY)
 dotbot init
 dotbot init --profile dotnet
 
-# Launch the web UI (port 8686)
+# Launch the web UI (default port 8686, auto-selects if busy)
 .bot\go.ps1
+.bot\go.ps1 -Port 9000   # Use a specific port
 ```
 
 ## Architecture
@@ -39,7 +40,7 @@ The framework source lives in `profiles/` and gets copied to `.bot/` on `dotbot 
 
 **MCP Server** (`systems/mcp/`) — Pure PowerShell MCP server (stdio transport, protocol 2024-11-05). Tools are auto-discovered from `tools/{tool-name}/` subdirectories, each containing `metadata.yaml` + `script.ps1`. 26 tools for task, session, plan, and dev management.
 
-**Web UI** (`systems/ui/`) — Pure PowerShell HTTP server with vanilla JS frontend. Dashboard tabs: Overview, Product, Workflow, Processes, Settings, Roadmap. Port 8686.
+**Web UI** (`systems/ui/`) — Pure PowerShell HTTP server with vanilla JS frontend. Dashboard tabs: Overview, Product, Workflow, Processes, Settings, Roadmap. Default port 8686 (auto-selects next available if busy).
 
 **Runtime** (`systems/runtime/`) — Manages Claude CLI invocations as tracked processes. `launch-process.ps1` is the unified entry point with process types: `analysis`, `execution`, `kickstart`, `planning`, `commit`, `task-creation`. Includes `WorktreeManager.psm1` for git worktree isolation and `ClaudeCLI.psm1` for Claude CLI wrapper.
 

@@ -466,7 +466,7 @@ Write-Host ""
 Write-Host "    .bot/systems/mcp/    " -NoNewline -ForegroundColor Yellow
 Write-Host "MCP server for task management" -ForegroundColor White
 Write-Host "    .bot/systems/ui/     " -NoNewline -ForegroundColor Yellow
-Write-Host "Web UI server (port 8686)" -ForegroundColor White
+Write-Host "Web UI server (default port 8686)" -ForegroundColor White
 Write-Host "    .bot/systems/runtime/" -NoNewline -ForegroundColor Yellow
 Write-Host "Autonomous loop for Claude CLI" -ForegroundColor White
 Write-Host "    .bot/prompts/        " -NoNewline -ForegroundColor Yellow

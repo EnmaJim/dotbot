@@ -23,7 +23,7 @@ cd .bot\systems\ui
 pwsh .\server.ps1
 ```
 
-The server runs on port 8686 by default.
+The server runs on port 8686 by default. If the port is busy, it auto-selects the next available port (up to 8699).
 
 ## Architecture
 
@@ -138,8 +138,8 @@ Typography: Consolas/Courier New monospace
 ## Troubleshooting
 
 ### Server won't start
-- Check if port 8686 is already in use
-- Try a different port: `.\server.ps1 -Port 8080`
+- The server auto-selects an available port (8686–8699) by default
+- To force a specific port: `.\server.ps1 -Port 8080`
 
 ### UI shows "No active session"
 - Launch a process from the PROCESSES tab
@@ -147,7 +147,7 @@ Typography: Consolas/Courier New monospace
 
 ### Browser shows stale data
 - Check browser console for fetch errors
-- Verify server is running and accessible at `http://localhost:8686`
+- Verify server is running and accessible (check the port shown in the server window)
 
 ## License
 

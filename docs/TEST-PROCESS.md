@@ -50,7 +50,7 @@ Start-Process pwsh.exe -ArgumentList "-NoExit", "-Command", "Set-Location 'C:\Us
 
 ### 5. Open the browser
 
-Navigate to http://localhost:8686/
+Navigate to the URL shown in the server window (default: http://localhost:8686/)
 
 ## What to verify
 

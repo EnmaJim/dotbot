@@ -12,7 +12,10 @@
 #>
 
 [CmdletBinding()]
-param()
+param(
+    [Parameter(Mandatory = $false)]
+    [int]$Port = 0
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -51,17 +54,41 @@ Write-Host "  Starting UI server..." -ForegroundColor Yellow
 Write-Host "   Location: $UIDir" -ForegroundColor DarkGray
 Write-Host ""
 
-# Start the server in a new PowerShell window
-Start-Process pwsh -ArgumentList "-File", "`"$ServerScript`""
-
-# Open browser after a short delay
-Start-Sleep -Seconds 2
-if (Get-Command Open-Url -ErrorAction SilentlyContinue) {
-    Open-Url "http://localhost:8686"
-} else {
-    Start-Process "http://localhost:8686"
+# Build server arguments
+$serverArgs = @("-File", "`"$ServerScript`"")
+if ($Port -gt 0) {
+    $serverArgs += "-Port", $Port.ToString()
 }
 
-Write-Host "  Browser opened at http://localhost:8686" -ForegroundColor Green
-Write-Host "   Server is running in a separate window." -ForegroundColor DarkGray
+# Start the server in a new PowerShell window
+Start-Process pwsh -ArgumentList $serverArgs
+
+# Wait for the server to write its selected port
+$uiPortFile = Join-Path $controlDir "ui-port"
+$resolvedPort = 0
+for ($i = 0; $i -lt 20; $i++) {
+    Start-Sleep -Milliseconds 250
+    if (Test-Path $uiPortFile) {
+        $raw = (Get-Content $uiPortFile -Raw).Trim()
+        if ($raw -match '^\d+$') {
+            $resolvedPort = [int]$raw
+            break
+        }
+    }
+}
+
+if ($resolvedPort -eq 0) {
+    $resolvedPort = if ($Port -gt 0) { $Port } else { 8686 }
+    Write-Host "  Could not detect server port, assuming $resolvedPort" -ForegroundColor Yellow
+}
+
+$url = "http://localhost:$resolvedPort"
+if (Get-Command Open-Url -ErrorAction SilentlyContinue) {
+    Open-Url $url
+} else {
+    Start-Process $url
+}
+
+Write-Host "  Browser opened at $url" -ForegroundColor Green
+Write-Host "   Server is running in a separate window (port $resolvedPort)." -ForegroundColor DarkGray
 Write-Host ""

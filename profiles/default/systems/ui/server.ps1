@@ -15,8 +15,36 @@ Port to run the web server on (default: 8686)
 
 param(
     [Parameter(Mandatory = $false)]
-    [int]$Port = 8686
+    [int]$Port = 8686,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$AutoPort
 )
+
+# ---------------------------------------------------------------------------
+# Port availability helper
+# ---------------------------------------------------------------------------
+function Find-AvailablePort {
+    param([int]$StartPort)
+    $maxPort = 8699
+    for ($p = $StartPort; $p -le $maxPort; $p++) {
+        try {
+            $tcp = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $p)
+            $tcp.Start()
+            $tcp.Stop()
+            return $p
+        } catch {
+            # Port in use — try next
+        }
+    }
+    throw "No available port found in range ${StartPort}–${maxPort}"
+}
+
+# Auto-select port when using the default or when -AutoPort is set
+$portExplicit = $PSBoundParameters.ContainsKey('Port') -and -not $AutoPort
+if (-not $portExplicit) {
+    $Port = Find-AvailablePort -StartPort $Port
+}
 
 # Find .bot root (server is at .bot/systems/ui, so go up 2 levels)
 $botRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -30,6 +58,10 @@ Import-Module (Join-Path $botRoot "systems\runtime\modules\DotBotTheme.psm1") -F
 $t = Get-DotBotTheme
 
 if (-not (Test-Path $controlDir)) { New-Item -Path $controlDir -ItemType Directory -Force | Out-Null }
+
+# Write selected port so go.ps1 (and other tools) can discover it
+$Port.ToString() | Set-Content (Join-Path $controlDir "ui-port") -NoNewline -Encoding UTF8
+
 $processesDir = Join-Path $controlDir "processes"
 if (-not (Test-Path $processesDir)) { New-Item -Path $processesDir -ItemType Directory -Force | Out-Null }
 
@@ -104,7 +136,11 @@ try {
     Write-Separator -Width 70
 } catch {
     Write-Phosphor " ✗" -Color Red
-    Write-Status "Error starting listener: $($_.Exception.Message)" -Type Error
+    if ($_.Exception.Message -match 'conflicts with an existing registration') {
+        Write-Status "Port $Port is already in use. Try a different port: .\server.ps1 -Port <number>" -Type Error
+    } else {
+        Write-Status "Error starting listener: $($_.Exception.Message)" -Type Error
+    }
     exit 1
 }
 
