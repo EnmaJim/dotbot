@@ -21,6 +21,7 @@ Thumbs.db
 # Server (DotbotServer C# app)
 server/src/**/bin/
 server/src/**/obj/
+server/src/**/appsettings.Development.json
 server/terraform/.terraform/
 server/terraform/tfplan
 server/terraform/*.tfstate
@@ -30,4 +31,8 @@ server/.env*
 !server/.env.example
 server/publish/
 server/publish.zip
+server/teams-app/manifest.json
 server/teams-app/*.zip
+
+# Specs (local design docs)
+specs/
