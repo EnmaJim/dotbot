@@ -84,6 +84,20 @@ Naming: folder=`kebab-case`, YAML name=`snake_case`, function=`Invoke-PascalCase
 
 CI runs layers 1-3 on push/PR across Windows, macOS, Linux. Layer 4 runs on schedule or manual trigger.
 
+## Dev Cycle
+
+After every set of changes, run the install script from the project root so the user can test against the latest build, then run level 1-3 tests:
+
+```bash
+# 1. Install/update (from dotbot-v3 repo root)
+pwsh install.ps1
+
+# 2. Run tests (layers 1-3)
+pwsh tests/Run-Tests.ps1
+```
+
+Always do both steps before considering a dev cycle complete. Do not skip tests.
+
 ## Key Conventions
 
 - Task lifecycle: `todo → analysing → analysed → in-progress → done` (also: `needs-input`, `skipped`)
