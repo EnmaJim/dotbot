@@ -68,9 +68,9 @@ async function updateKickstartPhases() {
                 renderOverviewKickstartPhases(data);
             }
         } else {
-            // Hide overview panel when no phases
-            const overviewPanel = document.getElementById('overview-kickstart-phases');
-            if (overviewPanel) overviewPanel.style.display = 'none';
+            // Hide overview side panel when no phases
+            const overviewSidePanel = document.getElementById('overview-side-panel');
+            if (overviewSidePanel) overviewSidePanel.style.display = 'none';
         }
     } catch (error) {
         // Silently ignore — non-critical

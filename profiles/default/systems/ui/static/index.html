@@ -338,11 +338,10 @@
                 <div class="tab-content">
                     <!-- Overview Tab -->
                     <div class="tab-pane active" id="tab-overview">
+                      <div class="overview-layout">
+                        <div class="overview-content">
                         <!-- Executive Summary -->
                         <div class="executive-summary" id="executive-summary" style="display: none;"></div>
-
-                        <!-- Kickstart Phases (Overview) -->
-                        <div id="overview-kickstart-phases" class="kickstart-phases-overview" style="display: none;"></div>
 
                         <!-- Stats Row -->
                         <div class="stats-row">
@@ -451,6 +450,16 @@
                                 </div>
                             </div>
                         </div>
+                        </div><!-- /.overview-content -->
+                        <div class="overview-side-panel" id="overview-side-panel" style="display: none;">
+                            <div class="overview-side-header" id="overview-side-toggle">
+                                ◈ Kickstart Progress
+                            </div>
+                            <div class="overview-side-content" id="overview-side-content">
+                                <div id="overview-kickstart-phases"></div>
+                            </div>
+                        </div>
+                      </div><!-- /.overview-layout -->
                     </div>
 
                     <!-- Pipeline Tab -->

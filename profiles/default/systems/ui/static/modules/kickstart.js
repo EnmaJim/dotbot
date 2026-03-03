@@ -874,8 +874,9 @@ async function resumeKickstart() {
  */
 function renderOverviewKickstartPhases(data) {
     const container = document.getElementById('overview-kickstart-phases');
-    if (!container || !data || !data.phases || data.phases.length === 0) {
-        if (container) container.style.display = 'none';
+    const sidePanel = document.getElementById('overview-side-panel');
+    if (!container || !sidePanel || !data || !data.phases || data.phases.length === 0) {
+        if (sidePanel) sidePanel.style.display = 'none';
         return;
     }
 
@@ -891,7 +892,7 @@ function renderOverviewKickstartPhases(data) {
         incomplete:'<span class="phase-icon phase-failed">&#9675;</span>'
     };
 
-    // Check if already rendered and preserve collapsed state
+    // Preserve collapsed state of inner phases section
     const existing = container.querySelector('.kickstart-phases');
     const wasCollapsed = existing ? existing.classList.contains('collapsed') : false;
 
@@ -928,13 +929,22 @@ function renderOverviewKickstartPhases(data) {
     `;
 
     container.innerHTML = html;
-    container.style.display = 'block';
+    sidePanel.style.display = 'flex';
 
-    // Add collapse/expand handler
-    const header = container.querySelector('.kickstart-phases .chain-layer-header');
-    if (header) {
-        header.addEventListener('click', () => {
-            header.closest('.kickstart-phases').classList.toggle('collapsed');
+    // Add collapse/expand handler for inner phases section
+    const phaseHeader = container.querySelector('.kickstart-phases .chain-layer-header');
+    if (phaseHeader) {
+        phaseHeader.addEventListener('click', () => {
+            phaseHeader.closest('.kickstart-phases').classList.toggle('collapsed');
+        });
+    }
+
+    // Bind side-panel header toggle (once)
+    const panelHeader = document.getElementById('overview-side-toggle');
+    if (panelHeader && !panelHeader.dataset.bound) {
+        panelHeader.dataset.bound = '1';
+        panelHeader.addEventListener('click', () => {
+            sidePanel.classList.toggle('collapsed');
         });
     }
 }

@@ -1249,12 +1249,63 @@
     background: var(--primary-15);
 }
 
-/* Kickstart Phases — Overview Tab wrapper */
-.kickstart-phases-overview {
-    margin-bottom: 16px;
+/* Kickstart Phases — Overview side panel */
+.overview-layout {
+    display: flex;
+    height: 100%;
+    gap: 1rem;
 }
-.kickstart-phases-overview .kickstart-phases {
+
+.overview-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.overview-side-panel {
+    width: 260px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--primary-20);
+    background: var(--bg-panel);
+    border-radius: 4px;
+    overflow: hidden;
+    align-self: flex-start;
+}
+
+.overview-side-header {
+    padding: 12px 14px;
+    background: var(--bezel-dark);
+    border-bottom: 1px solid var(--bezel-edge);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    font-family: var(--font-ui);
+    cursor: pointer;
+    user-select: none;
+}
+
+.overview-side-header:hover {
+    background: var(--primary-12);
+}
+
+.overview-side-content {
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.overview-side-panel.collapsed .overview-side-content {
+    display: none;
+}
+
+.overview-side-panel .kickstart-phases {
     border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
 }
 
 /* ========== SETTINGS TAB ========== */
