@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Layer 1: Structure tests for dotbot-v3 new user experience.
+    Layer 1: Structure tests for dotbot new user experience.
 .DESCRIPTION
     Tests dependencies, global install, project init, and platform functions.
     No AI/Claude dependency required.

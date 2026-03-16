@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-dotbot-v3 is a structured AI-assisted development framework built entirely in **PowerShell 7+**. It wraps AI coding workflows in managed, auditable processes with two-phase execution (analysis → implementation), per-task git worktree isolation, and a web dashboard for monitoring.
+dotbot is a structured AI-assisted development framework built entirely in **PowerShell 7+**. It wraps AI coding workflows in managed, auditable processes with two-phase execution (analysis → implementation), per-task git worktree isolation, and a web dashboard for monitoring.
 
 ## Commands
 
@@ -89,7 +89,7 @@ CI runs layers 1-3 on push/PR across Windows, macOS, Linux. Layer 4 runs on sche
 After every set of changes, run the install script from the project root so the user can test against the latest build, then run level 1-3 tests:
 
 ```bash
-# 1. Install/update (from dotbot-v3 repo root)
+# 1. Install/update (from dotbot repo root)
 pwsh install.ps1
 
 # 2. Run tests (layers 1-3)

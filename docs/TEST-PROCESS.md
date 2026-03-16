@@ -4,7 +4,7 @@ Quick reference for testing dotbot changes end-to-end.
 
 ## Prerequisites
 
-- dotbot-v3 repo checked out (source)
+- dotbot repo checked out (source)
 - `dotbot-test` sibling directory (disposable test target)
 - `c:\temp\spec.txt` containing a project description
 
@@ -13,7 +13,7 @@ Quick reference for testing dotbot changes end-to-end.
 ### 0. Install latest code
 
 ```powershell
-# From dotbot-v3 repo root
+# From dotbot repo root
 .\install.ps1
 ```
 

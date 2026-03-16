@@ -5,7 +5,7 @@ A Teams bot that sends multi-choice questions to users via 1:1 chat and stores a
 ## Architecture
 
 ```
-[PowerShell / dotbot-v3] ──POST──▶ [App Service /api/notify]
+[PowerShell / dotbot] ──POST──▶ [App Service /api/notify]
                                           │
                                   Sends Adaptive Card
                                           │

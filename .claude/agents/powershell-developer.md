@@ -72,7 +72,7 @@ You are an elite PowerShell 7+ engineer with deep expertise in modern PowerShell
 
 ## Development Workflow
 
-When working in the dotbot-v3 project:
+When working in the dotbot project:
 1. Follow the project's conventions from CLAUDE.md.
 2. After making changes, always run `pwsh install.ps1` then `pwsh tests/Run-Tests.ps1` (layers 1-3).
 3. For new MCP tools, create the three required files: `metadata.yaml`, `script.ps1`, `test.ps1`.

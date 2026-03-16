@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Test runner for dotbot-v3 integration test suite.
+    Test runner for dotbot integration test suite.
 .DESCRIPTION
     Orchestrates test layers 1-4. Use -Layer to select which layers to run.
 .PARAMETER Layer
@@ -24,7 +24,7 @@ $ErrorActionPreference = "Stop"
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Magenta
-Write-Host "  dotbot-v3 Integration Test Suite" -ForegroundColor Magenta
+Write-Host "  dotbot Integration Test Suite" -ForegroundColor Magenta
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Magenta
 Write-Host ""
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Layer 2: Component tests for dotbot-v3 MCP tools and modules.
+    Layer 2: Component tests for dotbot MCP tools and modules.
 .DESCRIPTION
     Tests MCP server boot, task lifecycle, validation, session tracking,
     and activity logging. No AI/Claude dependency required.

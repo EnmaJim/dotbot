@@ -1,4 +1,4 @@
-# dotbot-v3
+# dotbot
 
 **Structured, auditable AI-assisted development for teams.**
 
@@ -47,7 +47,7 @@ dotbot wraps AI-assisted coding in a managed, transparent workflow where every s
 
 ```powershell
 cd ~
-git clone https://github.com/andresharpe/dotbot-v3 dotbot-install
+git clone https://github.com/andresharpe/dotbot dotbot-install
 cd dotbot-install
 pwsh install.ps1
 ```

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    dotbot-v3 Smart Installation Script
+    dotbot Smart Installation Script
     Automatically detects context and runs the appropriate installation
 
 .DESCRIPTION
@@ -144,7 +144,7 @@ if ($isInDotbotRepo -and -not $isDotbotInstalled) {
     Write-Host ""
     Write-Host "  To install dotbot, run:" -ForegroundColor Yellow
     Write-Host ""
-    Write-Host "    git clone https://github.com/andresharpe/dotbot-v3 ~/dotbot-install" -ForegroundColor White
+    Write-Host "    git clone https://github.com/andresharpe/dotbot ~/dotbot-install" -ForegroundColor White
     Write-Host "    cd ~/dotbot-install" -ForegroundColor White
     Write-Host "    pwsh install.ps1" -ForegroundColor White
     Write-Host ""

@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    Layer 1b: Compilation and module validation tests for dotbot-v3.
+    Layer 1b: Compilation and module validation tests for dotbot.
 .DESCRIPTION
     Validates all .ps1 and .psm1 files in the source tree:
     1. Syntax parsing via AST parser (handles 'using namespace' correctly)

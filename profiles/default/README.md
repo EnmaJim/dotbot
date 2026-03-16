@@ -6,7 +6,7 @@ A project-agnostic framework for autonomous software development using Claude Co
 
 ```bash
 cd ~
-git clone https://github.com/andresharpe/dotbot-v3 dotbot-install
+git clone https://github.com/andresharpe/dotbot dotbot-install
 cd dotbot-install
 pwsh install.ps1
 ```
