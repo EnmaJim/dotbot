@@ -1716,6 +1716,18 @@ elseif ($Type -eq 'workflow') {
 
             $task = $taskResult.task
 
+            # --- Non-prompt task slot guard (before claim) ---
+            # Script/mcp/task_gen tasks must only run on slot 0.
+            # Check BEFORE claiming to avoid orphaning tasks in in-progress.
+            $taskTypeCheck = if ($task.type) { $task.type } else { 'prompt' }
+            if ($taskTypeCheck -eq 'prompt_template') { $taskTypeCheck = 'prompt' }
+            if ($Slot -gt 0 -and $taskTypeCheck -notin @('prompt')) {
+                Write-Status "Slot ${Slot}: skipping $taskTypeCheck task '$($task.name)' (slot 0 only)" -Type Info
+                Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Slot ${Slot}: waiting for prompt tasks (skipping $taskTypeCheck task)"
+                Start-Sleep -Seconds 5
+                continue
+            }
+
             # --- Multi-slot claim guard ---
             # When running with -Slot (concurrent workflow processes), another slot may
             # have claimed this task between our Get-NextWorkflowTask and this point.
@@ -1796,16 +1808,6 @@ elseif ($Type -eq 'workflow') {
                 $taskTypeVal = 'prompt'
             }
             if ($taskTypeVal -notin @('prompt')) {
-                # Non-prompt tasks (script/mcp/task_gen) are not parallelisable.
-                # Only slot 0 (or single-instance mode) may execute them;
-                # other slots skip and wait for prompt/scoring tasks.
-                if ($Slot -gt 0) {
-                    Write-Status "Slot ${Slot}: skipping $taskTypeVal task '$($task.name)' (slot 0 only)" -Type Info
-                    Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Slot ${Slot}: waiting for prompt tasks (skipping $taskTypeVal task)"
-                    Start-Sleep -Seconds 5
-                    continue
-                }
-
                 Write-Status "Auto-dispatching $taskTypeVal task: $($task.name)" -Type Process
                 Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Auto-dispatch $taskTypeVal task: $($task.name)"
 
