@@ -132,21 +132,12 @@ if ($Type -in @('analysis', 'execution', 'workflow')) {
     . "$PSScriptRoot\modules\test-task-completion.ps1"
     . "$PSScriptRoot\modules\create-problem-log.ps1"
 
-    # MCP tool functions
-    . "$PSScriptRoot\..\mcp\tools\session-initialize\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\session-get-state\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\session-get-stats\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\session-update\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\session-increment-completed\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\task-get-next\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\task-mark-in-progress\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\task-mark-skipped\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\task-mark-done\script.ps1"
-}
-
-if ($Type -in @('analysis', 'workflow')) {
-    . "$PSScriptRoot\..\mcp\tools\task-mark-analysing\script.ps1"
-    . "$PSScriptRoot\..\mcp\tools\task-mark-analysed\script.ps1"
+    # MCP tool functions — load ALL tools dynamically (includes workflow-specific ones)
+    $mcpToolsDir = Join-Path $PSScriptRoot "..\mcp\tools"
+    Get-ChildItem -Path $mcpToolsDir -Directory | ForEach-Object {
+        $toolScript = Join-Path $_.FullName "script.ps1"
+        if (Test-Path $toolScript) { . $toolScript }
+    }
 }
 
 # Load settings for model defaults
