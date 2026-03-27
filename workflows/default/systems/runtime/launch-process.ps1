@@ -2627,6 +2627,7 @@ elseif ($Type -eq 'kickstart') {
         $activeWorkflowDir = $null
         $manifest = Get-ActiveWorkflowManifest -BotRoot $botRoot
         if ($manifest -and $manifest.tasks -and $manifest.tasks.Count -gt 0) {
+            Ensure-ManifestTaskIds -Tasks $manifest.tasks
             $kickstartPhases = @($manifest.tasks)
             # Capture the workflow install dir so script phases can resolve workflow-scoped templates
             $wfInstallRoot = Join-Path $botRoot "workflows"
