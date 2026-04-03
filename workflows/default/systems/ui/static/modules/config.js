@@ -107,6 +107,9 @@ let currentWorkflowItem = { type: null, file: null };
 // Installed workflows (from /api/info)
 let installedWorkflows = [];
 
+// Installed workflow metadata keyed by name (from /api/workflows/installed)
+let installedWorkflowMap = {};
+
 // Pipeline workflow filter (null = show all)
 let pipelineWorkflowFilter = null;
 

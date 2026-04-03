@@ -652,8 +652,8 @@ function renderWorkflowDetailPanel(workflows) {
                 <span class="wf-header-icon">${getIcon('accountTree', 14)}</span>
                 <span class="wf-header-name">${escapeHtml(wf.name)}</span>
                 <div class="wf-header-actions">
-                    <button class="ctrl-btn-xs primary" onclick="runWorkflow('${escapeHtml(wf.name)}')" ${isRunning ? 'disabled' : ''} title="Run">${getIcon('playArrow', 12)}</button>
-                    <button class="ctrl-btn-xs" onclick="stopWorkflow('${escapeHtml(wf.name)}')" ${!isRunning ? 'disabled' : ''} title="Stop">${getIcon('stop', 12)}</button>
+                    <button class="ctrl-btn-xs primary wf-run-btn" data-workflow="${escapeHtml(wf.name)}" data-has-form="${!!wf.has_form}" ${isRunning ? 'disabled' : ''} title="Run">${getIcon('playArrow', 12)}</button>
+                    <button class="ctrl-btn-xs wf-stop-btn" data-workflow="${escapeHtml(wf.name)}" ${!isRunning ? 'disabled' : ''} title="Stop">${getIcon('stop', 12)}</button>
                 </div>
             </div>
         `;
@@ -771,6 +771,18 @@ function renderWorkflowDetailPanel(workflows) {
     container.innerHTML = html;
 
     // Wire event handlers
+    // Run/Stop buttons
+    container.querySelectorAll('.wf-run-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const name = btn.dataset.workflow;
+            const hasForm = btn.dataset.hasForm === 'true';
+            runWorkflow(name, hasForm);
+        });
+    });
+    container.querySelectorAll('.wf-stop-btn').forEach(btn => {
+        btn.addEventListener('click', () => stopWorkflow(btn.dataset.workflow));
+    });
+
     // Workflow header click → expand/collapse
     container.querySelectorAll('.wf-header').forEach(header => {
         header.addEventListener('click', (e) => {

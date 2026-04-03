@@ -8,6 +8,7 @@ let isNewProject = false;
 let kickstartInProgress = false;
 let analyseInProgress = false;
 let kickstartFiles = [];       // { name, size, content (base64) }
+let kickstartWorkflowName = null; // workflow name that triggered the modal
 let kickstartProcessId = null; // process_id returned from backend
 let kickstartPolling = null;   // interval ID for doc appearance detection
 let roadmapPolling = null;     // interval ID for task creation detection
@@ -225,7 +226,7 @@ function renderKickstartCTA(container) {
                 <div class="kickstart-title">${escapeHtml(title)}</div>
                 <div class="kickstart-description">${escapeHtml(desc)}</div>
                 ${phaseNames ? `<div class="kickstart-phase-inline">${phaseNames}</div>` : ''}
-                <button class="kickstart-btn" onclick="openKickstartModal()" style="margin-top: 1.5rem">${escapeHtml(buttonText)}</button>
+                <button class="kickstart-btn" onclick="openKickstartModal(currentWorkflowName)" style="margin-top: 1.5rem">${escapeHtml(buttonText)}</button>
             </div>
         `;
         return;
@@ -242,7 +243,7 @@ function renderKickstartCTA(container) {
                 <div class="kickstart-title">${escapeHtml(title)}</div>
                 <div class="kickstart-description">${escapeHtml(desc)}</div>
                 <div class="kickstart-phase-inline">${phaseNames}</div>
-                <button class="kickstart-btn" onclick="openKickstartModal()" style="margin-top: 1.5rem">RUN WORKFLOW</button>
+                <button class="kickstart-btn" onclick="openKickstartModal(currentWorkflowName)" style="margin-top: 1.5rem">RUN WORKFLOW</button>
             </div>
         `;
         return;
@@ -256,7 +257,7 @@ function renderKickstartCTA(container) {
             <div class="kickstart-description">
                 Describe your project and let Claude create your foundational product documents.
             </div>
-            <button class="kickstart-btn" onclick="openKickstartModal()">KICKSTART PROJECT</button>
+            <button class="kickstart-btn" onclick="openKickstartModal(currentWorkflowName)">KICKSTART PROJECT</button>
         </div>
     `;
 }
@@ -292,7 +293,7 @@ function renderWorkflowCardGrid(container) {
                     <span class="${ledClass}"></span>
                     <span class="workflow-card-name">${escapeHtml(name)}</span>
                     <div class="workflow-card-actions">
-                        <button class="ctrl-btn-xs primary wf-run-btn" title="Run ${escapeHtml(name)}" ${isRunning ? 'disabled' : ''}>Run</button>
+                        <button class="ctrl-btn-xs primary wf-run-btn" title="Run ${escapeHtml(name)}" ${isRunning || Object.keys(installedWorkflowMap).length === 0 ? 'disabled' : ''}>Run</button>
                         <button class="ctrl-btn-xs wf-stop-btn" title="Stop ${escapeHtml(name)}" ${!isRunning ? 'disabled' : ''}>Stop</button>
                     </div>
                 </div>
@@ -320,7 +321,10 @@ function renderWorkflowCardGrid(container) {
         const wfName = names[index];
         if (!wfName) return;
         const runBtn = card.querySelector('.wf-run-btn');
-        if (runBtn) runBtn.addEventListener('click', () => runWorkflow(wfName));
+        if (runBtn) runBtn.addEventListener('click', () => {
+            const wfMeta = installedWorkflowMap[wfName];
+            runWorkflow(wfName, !!(wfMeta && wfMeta.has_form));
+        });
         const stopBtn = card.querySelector('.wf-stop-btn');
         if (stopBtn) stopBtn.addEventListener('click', () => stopWorkflow(wfName));
     });
@@ -330,9 +334,12 @@ function renderWorkflowCardGrid(container) {
 /**
  * Open the kickstart modal
  */
-function openKickstartModal() {
+function openKickstartModal(workflowName) {
     const modal = document.getElementById('kickstart-modal');
     const textarea = document.getElementById('kickstart-prompt');
+
+    // Store which workflow triggered the modal so the submit path uses the right one
+    kickstartWorkflowName = workflowName || null;
 
     if (modal) {
         modal.classList.add('visible');
@@ -352,6 +359,7 @@ function closeKickstartModal() {
         modal.classList.remove('visible');
         if (textarea) textarea.value = '';
         kickstartFiles = [];
+        kickstartWorkflowName = null;
         updateFileList();
         const interviewCheckbox = document.getElementById('kickstart-interview');
         if (interviewCheckbox) interviewCheckbox.checked = true;
@@ -520,6 +528,7 @@ async function executeKickstart(prompt, needsInterview, autoWorkflow, skipPhases
                 needs_interview: needsInterview,
                 auto_workflow: autoWorkflow,
                 skip_phases: skipPhases,
+                workflow_name: kickstartWorkflowName || undefined,
                 files: kickstartFiles.map(f => ({
                     name: f.name,
                     content: f.content

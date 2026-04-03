@@ -38,9 +38,9 @@ async function pollState() {
             Aether.processState(state);
         }
 
-        // Throttled kickstart phase status (every 5th poll cycle)
+        // Throttled kickstart phase status (every 5th poll cycle, but always on first poll)
         kickstartPollCounter++;
-        if (kickstartPollCounter >= 5) {
+        if (kickstartPollCounter >= 5 || Object.keys(installedWorkflowMap).length === 0) {
             kickstartPollCounter = 0;
             updateKickstartPhases();
             // Refresh installed workflow controls (throttled alongside kickstart)
@@ -61,12 +61,19 @@ async function updateInstalledWorkflowControls() {
         const response = await fetch(`${API_BASE}/api/workflows/installed`);
         if (!response.ok) return;
         const data = await response.json();
+        // Build a name→metadata map so all modules can look up per-workflow flags
+        installedWorkflowMap = {};
+        (data.workflows || []).forEach(wf => { installedWorkflowMap[wf.name] = wf; });
         if (typeof renderWorkflowControls === 'function') {
             renderWorkflowControls(data.workflows || []);
         }
         // Feed the Workflow tab's navigation tree
         if (typeof renderWorkflowDetailPanel === 'function') {
             renderWorkflowDetailPanel(data.workflows || []);
+        }
+        // Re-render executive summary so kickstart card grid picks up the updated map
+        if (typeof updateExecutiveSummary === 'function') {
+            updateExecutiveSummary();
         }
     } catch (error) {
         // Silently ignore — non-critical
