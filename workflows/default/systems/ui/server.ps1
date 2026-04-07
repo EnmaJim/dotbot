@@ -1197,7 +1197,7 @@ try {
                             $reader = New-Object System.IO.StreamReader($request.InputStream)
                             $body = $reader.ReadToEnd() | ConvertFrom-Json
                             $reader.Close()
-                            $content = Submit-TaskAnswer -TaskId $body.task_id -Answer $body.answer -CustomText $body.custom_text | ConvertTo-Json -Depth 5 -Compress
+                            $content = Submit-TaskAnswer -TaskId $body.task_id -Answer $body.answer -CustomText $body.custom_text -Attachments $body.attachments | ConvertTo-Json -Depth 10 -Compress
                         } catch {
                             $statusCode = 500
                             $content = @{ success = $false; error = "Failed to submit answer: $($_.Exception.Message)" } | ConvertTo-Json -Compress
@@ -1469,13 +1469,56 @@ try {
                                     $statusCode = 404
                                     $content = @{ success = $false; error = "Process not found: $($body.process_id)" } | ConvertTo-Json -Compress
                                 } else {
+                                    # Save any per-question attachment files and replace base64 with paths
+                                    $allowedAttachExtensions = @('.md', '.docx', '.xlsx', '.pdf', '.txt')
+                                    $productDir = Join-Path $botRoot "workspace\product"
+                                    $processedAnswers = @()
+                                    foreach ($ans in @($body.answers)) {
+                                        $ansObj = @{
+                                            question_id = $ans.question_id
+                                            question    = $ans.question
+                                            answer      = $ans.answer
+                                        }
+                                        if ($ans.attachments -and @($ans.attachments).Count -gt 0) {
+                                            $attachMeta = @()
+                                            $attachDir = Join-Path $productDir "attachments\$($ans.question_id)"
+                                            if (-not (Test-Path $attachDir)) {
+                                                New-Item -ItemType Directory -Force -Path $attachDir | Out-Null
+                                            }
+                                            foreach ($att in @($ans.attachments)) {
+                                                $ext = [System.IO.Path]::GetExtension($att.name).ToLower()
+                                                if ($ext -notin $allowedAttachExtensions) { continue }
+                                                try {
+                                                    $bytes = [System.Convert]::FromBase64String($att.content)
+                                                    $filePath = Join-Path $attachDir $att.name
+                                                    [System.IO.File]::WriteAllBytes($filePath, $bytes)
+                                                    $relPath = ".bot/workspace/product/attachments/$($ans.question_id)/$($att.name)"
+                                                    $attachMeta += @{
+                                                        name = $att.name
+                                                        size = $att.size
+                                                        path = $relPath
+                                                    }
+                                                } catch {
+                                                    Write-BotLog "Failed to save kickstart attachment '$($att.name)': $($_.Exception.Message)"
+                                                }
+                                            }
+                                            if ($attachMeta.Count -gt 0) {
+                                                $ansObj['attachments'] = $attachMeta
+                                                # Embed paths in answer text so the AI can locate the files
+                                                $pathList = ($attachMeta | ForEach-Object { $_.path }) -join ', '
+                                                $pathNote = "Attached: $pathList"
+                                                $ansObj['answer'] = if ($ansObj['answer']) { "$($ansObj['answer'])`n$pathNote" } else { $pathNote }
+                                            }
+                                        }
+                                        $processedAnswers += $ansObj
+                                    }
+
                                     # Write answers file that the interview loop is polling for
                                     $answersData = @{
                                         skipped = ($body.skipped -eq $true)
-                                        answers = @($body.answers)
+                                        answers = $processedAnswers
                                         submitted_at = (Get-Date).ToUniversalTime().ToString("o")
                                     }
-                                    $productDir = Join-Path $botRoot "workspace\product"
                                     $answersPath = Join-Path $productDir "clarification-answers.json"
                                     $answersData | ConvertTo-Json -Depth 10 | Set-Content -Path $answersPath -Encoding utf8NoBOM
                                     $content = @{ success = $true } | ConvertTo-Json -Compress

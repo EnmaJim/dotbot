@@ -379,7 +379,8 @@ function Submit-TaskAnswer {
     param(
         [Parameter(Mandatory)] [string]$TaskId,
         $Answer,
-        [string]$CustomText
+        [string]$CustomText,
+        $Attachments  # array of { name, size, content (base64) } from frontend
     )
 
     # Use custom text as answer when no option selected
@@ -387,11 +388,72 @@ function Submit-TaskAnswer {
         $Answer = $CustomText
     }
 
-    . $script:TaskAnswerQuestionScript
-    $result = Invoke-TaskAnswerQuestion -Arguments @{
-        task_id = $TaskId
-        answer = $Answer
+    # Save attachment files to disk and build metadata
+    $attachmentMeta = @()
+    if ($Attachments -and @($Attachments).Count -gt 0) {
+        $allowedExtensions = @('.md', '.docx', '.xlsx', '.pdf', '.txt')
+
+        # Find the task to get the pending question ID for directory naming
+        $needsInputDir = Join-Path $script:Config.BotRoot "workspace\tasks\needs-input"
+        $taskFile = Get-ChildItem -Path $needsInputDir -Filter "*.json" -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                try { (Get-Content $_.FullName -Raw | ConvertFrom-Json).id -eq $TaskId } catch { $false }
+            } | Select-Object -First 1
+
+        if ($taskFile) {
+            $taskData = Get-Content $taskFile.FullName -Raw | ConvertFrom-Json
+            $questionId = $taskData.pending_question.id
+
+            $attachDir = Join-Path $script:Config.BotRoot "workspace\attachments\$TaskId\$questionId"
+            if (-not (Test-Path $attachDir)) {
+                New-Item -ItemType Directory -Force -Path $attachDir | Out-Null
+            }
+
+            foreach ($att in @($Attachments)) {
+                $ext = [System.IO.Path]::GetExtension($att.name).ToLower()
+                if ($ext -notin $allowedExtensions) {
+                    Write-DotbotWarning "Skipping attachment '$($att.name)': unsupported extension '$ext'"
+                    continue
+                }
+
+                try {
+                    $bytes = [System.Convert]::FromBase64String($att.content)
+                    $filePath = Join-Path $attachDir $att.name
+                    [System.IO.File]::WriteAllBytes($filePath, $bytes)
+                    $relPath = ".bot/workspace/attachments/$TaskId/$questionId/$($att.name)"
+
+                    $attachmentMeta += @{
+                        name = $att.name
+                        size = $att.size
+                        path = $relPath
+                    }
+                } catch {
+                    Write-DotbotWarning "Failed to save attachment '$($att.name)': $($_.Exception.Message)"
+                }
+            }
+        }
     }
+
+    # If attachments were saved, embed their paths in the answer so the AI can locate them
+    if ($attachmentMeta.Count -gt 0) {
+        $pathList = ($attachmentMeta | ForEach-Object { $_.path }) -join ', '
+        $pathNote = "Attached: $pathList"
+        $Answer = if ($Answer) { "$Answer`n$pathNote" } else { $pathNote }
+    }
+
+    if (-not $Answer) {
+        throw "Answer is required"
+    }
+
+    . $script:TaskAnswerQuestionScript
+    $toolArgs = @{
+        task_id = $TaskId
+        answer  = $Answer
+    }
+    if ($attachmentMeta.Count -gt 0) {
+        $toolArgs['attachments'] = $attachmentMeta
+    }
+    $result = Invoke-TaskAnswerQuestion -Arguments $toolArgs
 
     Write-Status "Answered question for task: $TaskId" -Type Success
     return $result
