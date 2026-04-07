@@ -37,6 +37,9 @@ public class StoragePathResolver
     public string DeviceTokenPath(string deviceTokenId)
         => $"{_env}/tokens/devices/{deviceTokenId}.json";
 
+    public string AttachmentBlobPath(Guid responseId, string fileName)
+        => $"{_env}/attachments/{responseId}/{fileName}";
+
     public string AdministratorsPath()
         => $"{_env}/config/administrators.json";
 }

@@ -196,10 +196,11 @@ Review all context above. Decide whether to write clarification-questions.json (
                             $notif = $interviewNotifications[$qId]
                             $resp = Get-TaskNotificationResponse -Notification $notif -Settings $interviewNotifSettings
                             if ($resp) {
-                                $answer = if ($resp.selectedKey) { $resp.selectedKey } elseif ($resp.freeText) { $resp.freeText } else { $null }
-                                if ($answer) {
-                                    $teamsAnswers[$qId] = $answer
-                                    Write-Status "Received Teams answer for $qId : $answer" -Type Info
+                                $attachDir = Join-Path $ProductDir "attachments\$qId"
+                                $resolved = Resolve-NotificationAnswer -Response $resp -Settings $interviewNotifSettings -AttachDir $attachDir
+                                if ($resolved) {
+                                    $teamsAnswers[$qId] = $resolved
+                                    Write-Status "Received Teams answer for $qId : $($resolved.answer)" -Type Info
                                 }
                             }
                         } catch { Write-BotLog -Level Warn -Message "Teams polling attempt failed" -Exception $_ }
@@ -209,15 +210,14 @@ Review all context above. Decide whether to write clarification-questions.json (
                     if ($teamsAnswers.Count -ge $questions.Count) {
                         $answersObj = @{
                             answers = @($questions | ForEach-Object {
-                                @{
-                                    id       = $_.id
-                                    question = $_.question
-                                    answer   = $teamsAnswers[$_.id]
-                                }
+                                $r = $teamsAnswers[$_.id]
+                                $entry = @{ id = $_.id; question = $_.question; answer = $r.answer }
+                                if ($r.attachments -and $r.attachments.Count -gt 0) { $entry['attachments'] = $r.attachments }
+                                $entry
                             })
                             answered_via = "teams"
                         }
-                        $answersObj | ConvertTo-Json -Depth 5 | Set-Content -Path $answersPath -Encoding UTF8
+                        $answersObj | ConvertTo-Json -Depth 10 | Set-Content -Path $answersPath -Encoding UTF8
                         Write-Status "All $($questions.Count) answers received via Teams" -Type Complete
                         break
                     }

@@ -102,6 +102,7 @@ try
     builder.Services.AddSingleton<TemplateStorageService>();
     builder.Services.AddSingleton<InstanceStorageService>();
     builder.Services.AddSingleton<ResponseStorageService>();
+    builder.Services.AddSingleton<AttachmentStorageService>();
     builder.Services.AddSingleton<ConversationReferenceStore>();
     builder.Services.AddSingleton<AdaptiveCardService>();
 
@@ -327,6 +328,19 @@ try
             list.Add(r);
         logger.LogInformation("Listed {Count} response(s) for instance {InstanceId}", list.Count, instanceId);
         return Results.Ok(list.OrderBy(r => r.SubmittedAt));
+    });
+
+    // ── Download attachment by blob path (API key protected) ────────────────
+    app.MapGet("/api/attachments/{**blobPath}", async (
+        string blobPath,
+        AttachmentStorageService attachments,
+        ILogger<Program> logger) =>
+    {
+        var result = await attachments.DownloadAsync(blobPath);
+        if (result is null) return Results.NotFound();
+        var (stream, contentType) = result.Value;
+        var fileName = Path.GetFileName(blobPath);
+        return Results.File(stream, contentType, fileName);
     });
 
     // ── Revoke a device token (API key protected) ───────────────────────────
