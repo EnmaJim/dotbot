@@ -314,6 +314,7 @@ function Invoke-Registry {
         'add'    { Join-Path $ScriptsDir 'registry-add.ps1' }
         'remove' { Join-Path $ScriptsDir 'registry-remove.ps1' }
         'list'   { Join-Path $ScriptsDir 'registry-list.ps1' }
+        'update' { Join-Path $ScriptsDir 'registry-update.ps1' }
         default  { $null }
     }
 
@@ -344,11 +345,17 @@ function Invoke-Registry {
             if ($positional.Count -ge 2) { $regSplat['Source'] = $positional[1] }
         } elseif ($regSubCmd -eq 'remove') {
             if ($positional.Count -ge 1) { $regSplat['Name'] = $positional[0] }
+        } elseif ($regSubCmd -eq 'update') {
+            if ($positional.Count -ge 1) { $regSplat['Name'] = $positional[0] }
         }
 
         & $regScript @regSplat
     } else {
-        Write-DotbotWarning "Usage: dotbot registry [add] <name> <source> [--branch main] [--force]"
+        Write-DotbotWarning "Usage: dotbot registry [add|list|update|remove] ..."
+        Write-DotbotCommand "  add    <name> <source> [--branch main] [--force]"
+        Write-DotbotCommand "  list"
+        Write-DotbotCommand "  update [name] [--force]"
+        Write-DotbotCommand "  remove <name>"
     }
 }
 
