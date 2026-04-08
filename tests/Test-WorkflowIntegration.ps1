@@ -453,7 +453,12 @@ try {
 
             foreach ($task in $conditionedTasks) {
                 $condResult = Test-ManifestCondition -ProjectRoot $testProjectConditions -Condition $task.condition
-                Write-TestResult -Name "Task '$($task.name)' condition evaluates without error" -Status Pass
+                Assert-True -Name "Task '$($task.name)' condition returns boolean result" `
+                    -Condition ($condResult -is [bool]) `
+                    -Message "Expected boolean but got: $($condResult)"
+                Assert-True -Name "Task '$($task.name)' condition evaluates to true after init" `
+                    -Condition ($condResult -eq $true) `
+                    -Message "Condition evaluated to false; expected true after project init"
             }
         } else {
             # Default workflow uses depends_on (not condition) — verify tasks have dependencies instead
