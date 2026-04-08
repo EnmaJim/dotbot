@@ -57,7 +57,7 @@ Settings > Branches > Add rule for `main`:
 - [x] Require approvals: 1
 - [x] Dismiss stale pull request approvals when new commits are pushed
 - [x] Require status checks to pass before merging
-  - Add: `check` (from the `PR link check` workflow)
+  - Add: `PR link check / check` (the job name from the `pr-link-check` workflow)
 - [ ] Do not require branches to be up to date (optional, your call)
 
 ### General
@@ -74,13 +74,15 @@ Provision webhooks using the existing discord.js tooling.
 
 ### Run the webhook script
 
+The webhook provisioning scripts live in `ideas/team/discord-setup/` which is gitignored (local tooling only). If you don't have it, ask Andre for a copy.
+
 ```bash
 cd ideas/team/discord-setup
 npm install        # if not already done
 npm run webhooks   # runs create-webhooks.js
 ```
 
-Requires `DISCORD_BOT_TOKEN` env var (see `Svc_Tf/DISCORD.md` for KeePassXC auth).
+Requires the `DISCORD_BOT_TOKEN` environment variable. Set it via KeePassXC before running (the token is stored under `APIs/discord/dotbot-bot` in the team KeePass vault).
 
 The script will print four webhook URLs. Copy each into the matching GitHub Actions secret:
 
@@ -113,5 +115,5 @@ After completing steps 1-3, verify everything works:
 - [ ] Trigger `triage-nudge.yml` via workflow_dispatch:
   - Expect a post in `#advisory-steering` (if any `needs-triage` issues exist > 2 days)
 - [ ] Add senior contributor GitHub handles to `.github/CODEOWNERS`
-- [ ] Replace `discord.gg/REPLACE_ME` in `.github/ISSUE_TEMPLATE/config.yml` and `.github/ISSUE_TEMPLATE/question.yml` with the real invite URL from `ideas/team/discord-server.json` (`https://discord.gg/UPQDpN2f8N`)
+- [ ] Verify the Discord invite URLs in `.github/ISSUE_TEMPLATE/config.yml` and `.github/ISSUE_TEMPLATE/question.yml` are still valid (`https://discord.gg/UPQDpN2f8N`)
 - [ ] Close/delete the test issues

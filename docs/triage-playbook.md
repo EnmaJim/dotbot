@@ -51,7 +51,7 @@ What this does NOT cover.
 Anything unresolved that might change the approach.
 ```
 
-For bigger architectural decisions, create an ADR in `docs/adr/` and discuss in `#decisions-adrs` on Discord.
+For bigger architectural decisions, discuss in `#decisions-adrs` on Discord and record the decision as an ADR in the repo (create a `docs/adr/` folder when the first one is needed).
 
 ## Escalation
 

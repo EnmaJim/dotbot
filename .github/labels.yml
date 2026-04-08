@@ -67,7 +67,10 @@
   description: "Waiting for more information from the reporter"
 - name: stale
   color: "BF360C"
-  description: "No activity for an extended period"
+  description: "No activity for an extended period - ready issues"
+- name: stale-triage
+  color: "E65100"
+  description: "No activity for an extended period - untriaged issues"
 
 # --- Workflow override ---
 - name: no-issue

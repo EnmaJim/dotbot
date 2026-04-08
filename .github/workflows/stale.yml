@@ -2,7 +2,7 @@ name: "Stale issues"
 
 on:
   schedule:
-    - cron: "0 7 * * 1"    # Monday 08:00 Europe/Zurich (UTC+1)
+    - cron: "0 7 * * 1"    # Monday 07:00 UTC (09:00 CEST / 08:00 CET)
   workflow_dispatch:
 
 permissions:
@@ -43,7 +43,7 @@ jobs:
             group should review it or close it with a reason.
           days-before-issue-stale: 30
           days-before-issue-close: -1
-          stale-issue-label: stale
+          stale-issue-label: stale-triage
           only-issue-labels: needs-triage
 
           days-before-pr-stale: -1

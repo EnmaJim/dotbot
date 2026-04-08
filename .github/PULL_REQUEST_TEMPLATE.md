@@ -22,4 +22,4 @@ Closes #
 - [ ] Tests added or updated
 - [ ] Docs updated (if behaviour changed)
 - [ ] Linked issue exists
-- [ ] Follows the [contribution guide](../CONTRIBUTING.md)
+- [ ] Follows the [contribution guide](https://github.com/andresharpe/dotbot/blob/main/CONTRIBUTING.md)
