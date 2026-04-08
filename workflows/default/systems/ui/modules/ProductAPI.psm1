@@ -919,7 +919,12 @@ function Resume-ProductKickstart {
             return @{ _statusCode = 400; success = $false; error = "Cannot resume — no saved prompt or mission document found. Please start a new kickstart." }
         }
     }
-    $originalPrompt = Get-Content -LiteralPath $promptFile -Raw
+    # Preflight: verify prompt file is readable before spawning async wrapper
+    try {
+        $null = Get-Content -LiteralPath $promptFile -Raw -ErrorAction Stop
+    } catch {
+        return @{ _statusCode = 400; success = $false; error = "Cannot resume — saved prompt is not readable." }
+    }
 
     # Launch resumed kickstart
     $launcherPath = Join-Path $botRoot "systems\runtime\launch-process.ps1"
