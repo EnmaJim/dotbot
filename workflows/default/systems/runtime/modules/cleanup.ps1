@@ -60,7 +60,7 @@ function Get-ClaudeProjectDir {
     # Convert path to hash format: colons and slashes replaced with dashes (matches Claude's project dir naming)
     $projectHash = $fullPath -replace ':', '-' -replace '\\', '-' -replace '/', '-'
 
-    $claudeProjectDir = Join-Path $HOME ".claude/projects/$projectHash"
+    $claudeProjectDir = Join-Path (Join-Path (Join-Path $HOME '.claude') 'projects') $projectHash
 
     if (Test-Path $claudeProjectDir) {
         return $claudeProjectDir
