@@ -2762,8 +2762,15 @@ if (Test-Path $productApiModule) {
         # JSON files for type/resolution tests
         Set-Content -Path (Join-Path $productDir "config.json") -Value '{"key":"value"}' -Encoding UTF8
         Set-Content -Path (Join-Path $productDir "mission.json") -Value '{"title":"Mission JSON"}' -Encoding UTF8
-        # Binary file for type/size tests
+        # Image files for type tests
         [System.IO.File]::WriteAllBytes((Join-Path $productDir "logo.png"), [byte[]](0x89, 0x50, 0x4E, 0x47))
+        [System.IO.File]::WriteAllBytes((Join-Path $productDir "screenshot.jpg"), [byte[]](0xFF, 0xD8, 0xFF, 0xE0))
+        [System.IO.File]::WriteAllBytes((Join-Path $productDir "animation.gif"), [byte[]](0x47, 0x49, 0x46, 0x38))
+        Set-Content -Path (Join-Path $productDir "diagram.svg") -Value '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>' -Encoding UTF8
+        # Text file for txt type tests
+        Set-Content -Path (Join-Path $productDir "notes.txt") -Value "Plain text content with <html> special chars" -Encoding UTF8
+        # True binary file for binary type tests
+        [System.IO.File]::WriteAllBytes((Join-Path $productDir "document.pdf"), [byte[]](0x25, 0x50, 0x44, 0x46))
         # .gitkeep should be excluded
         Set-Content -Path (Join-Path $briefingDir ".gitkeep") -Value "" -Encoding UTF8
 
@@ -2771,7 +2778,7 @@ if (Test-Path $productApiModule) {
 
         $docs = @((Get-ProductList).docs)
         Assert-Equal -Name "ProductAPI lists nested product docs" `
-            -Expected 7 `
+            -Expected 12 `
             -Actual $docs.Count
         Assert-Equal -Name "ProductAPI keeps mission first in priority order" `
             -Expected "mission" `
@@ -2800,13 +2807,13 @@ if (Test-Path $productApiModule) {
 
         # Metadata field tests (type, size, depth)
         $logoPng = $docs | Where-Object { $_.name -eq 'logo.png' }
-        Assert-True -Name "ProductAPI includes binary files in list" `
+        Assert-True -Name "ProductAPI includes image files in list" `
             -Condition ($null -ne $logoPng) `
-            -Message "Binary file logo.png missing from product list"
-        Assert-Equal -Name "ProductAPI returns type=binary for non-md files" `
-            -Expected "binary" `
+            -Message "Image file logo.png missing from product list"
+        Assert-Equal -Name "ProductAPI returns type=image for .png files" `
+            -Expected "image" `
             -Actual $logoPng.type
-        Assert-True -Name "ProductAPI returns size field for binary files" `
+        Assert-True -Name "ProductAPI returns size field for image files" `
             -Condition ($logoPng.size -gt 0) `
             -Message "Expected non-zero size for logo.png"
         Assert-Equal -Name "ProductAPI returns depth=0 for root files" `
@@ -2852,6 +2859,125 @@ if (Test-Path $productApiModule) {
         Assert-True -Name "ProductAPI loads explicit .json route when .md also exists" `
             -Condition ($missionJsonDoc.success -eq $true -and $missionJsonDoc.content -match 'Mission JSON') `
             -Message "Expected mission.json content when requested explicitly"
+
+        # ── Text file (.txt) support tests ──
+
+        $notesTxt = $docs | Where-Object { $_.name -eq 'notes.txt' }
+        Assert-True -Name "ProductAPI includes .txt files in list" `
+            -Condition ($null -ne $notesTxt) `
+            -Message "Text file notes.txt missing from product list"
+        Assert-Equal -Name "ProductAPI returns type=txt for .txt files" `
+            -Expected "txt" `
+            -Actual $notesTxt.type
+        Assert-Equal -Name "ProductAPI retains .txt extension in name" `
+            -Expected "notes.txt" `
+            -Actual $notesTxt.name
+
+        $txtDoc = Get-ProductDocument -Name "notes.txt"
+        Assert-True -Name "ProductAPI loads .txt doc by name" `
+            -Condition ($txtDoc.success -eq $true -and $txtDoc.content -match 'Plain text content') `
+            -Message "Text doc notes.txt could not be loaded"
+
+        # ── Image file type detection tests ──
+
+        $screenshotJpg = $docs | Where-Object { $_.name -eq 'screenshot.jpg' }
+        Assert-True -Name "ProductAPI includes .jpg files in list" `
+            -Condition ($null -ne $screenshotJpg) `
+            -Message "Image file screenshot.jpg missing from product list"
+        Assert-Equal -Name "ProductAPI returns type=image for .jpg files" `
+            -Expected "image" `
+            -Actual $screenshotJpg.type
+
+        $animationGif = $docs | Where-Object { $_.name -eq 'animation.gif' }
+        Assert-True -Name "ProductAPI includes .gif files in list" `
+            -Condition ($null -ne $animationGif) `
+            -Message "Image file animation.gif missing from product list"
+        Assert-Equal -Name "ProductAPI returns type=image for .gif files" `
+            -Expected "image" `
+            -Actual $animationGif.type
+
+        $diagramSvg = $docs | Where-Object { $_.name -eq 'diagram.svg' }
+        Assert-True -Name "ProductAPI includes .svg files in list" `
+            -Condition ($null -ne $diagramSvg) `
+            -Message "Image file diagram.svg missing from product list"
+        Assert-Equal -Name "ProductAPI returns type=image for .svg files" `
+            -Expected "image" `
+            -Actual $diagramSvg.type
+
+        Assert-Equal -Name "ProductAPI retains image extension in name" `
+            -Expected "screenshot.jpg" `
+            -Actual $screenshotJpg.name
+
+        # ── True binary files still classified as binary ──
+
+        $documentPdf = $docs | Where-Object { $_.name -eq 'document.pdf' }
+        Assert-True -Name "ProductAPI includes true binary files in list" `
+            -Condition ($null -ne $documentPdf) `
+            -Message "Binary file document.pdf missing from product list"
+        Assert-Equal -Name "ProductAPI returns type=binary for unknown extensions" `
+            -Expected "binary" `
+            -Actual $documentPdf.type
+
+        # ── Get-ProductDocumentRaw tests ──
+
+        $rawPng = Get-ProductDocumentRaw -Name "logo.png"
+        Assert-True -Name "ProductDocumentRaw finds .png file" `
+            -Condition ($rawPng.Found -eq $true) `
+            -Message "Get-ProductDocumentRaw did not find logo.png"
+        Assert-Equal -Name "ProductDocumentRaw returns image/png MIME type" `
+            -Expected "image/png" `
+            -Actual $rawPng.MimeType
+        Assert-True -Name "ProductDocumentRaw returns binary data for .png" `
+            -Condition ($null -ne $rawPng.BinaryData -and $rawPng.BinaryData.Length -gt 0) `
+            -Message "Expected non-empty BinaryData for logo.png"
+
+        $rawJpg = Get-ProductDocumentRaw -Name "screenshot.jpg"
+        Assert-Equal -Name "ProductDocumentRaw returns image/jpeg MIME type for .jpg" `
+            -Expected "image/jpeg" `
+            -Actual $rawJpg.MimeType
+        Assert-True -Name "ProductDocumentRaw returns binary data for .jpg" `
+            -Condition ($null -ne $rawJpg.BinaryData -and $rawJpg.BinaryData.Length -gt 0) `
+            -Message "Expected non-empty BinaryData for screenshot.jpg"
+
+        $rawGif = Get-ProductDocumentRaw -Name "animation.gif"
+        Assert-Equal -Name "ProductDocumentRaw returns image/gif MIME type" `
+            -Expected "image/gif" `
+            -Actual $rawGif.MimeType
+
+        $rawSvg = Get-ProductDocumentRaw -Name "diagram.svg"
+        Assert-True -Name "ProductDocumentRaw finds .svg file" `
+            -Condition ($rawSvg.Found -eq $true) `
+            -Message "Get-ProductDocumentRaw did not find diagram.svg"
+        Assert-Equal -Name "ProductDocumentRaw returns image/svg+xml MIME type" `
+            -Expected "image/svg+xml" `
+            -Actual $rawSvg.MimeType
+        Assert-True -Name "ProductDocumentRaw returns text content for .svg (not binary)" `
+            -Condition ($null -ne $rawSvg.TextContent -and $rawSvg.TextContent -match '<svg') `
+            -Message "Expected SVG text content, not binary data"
+        Assert-True -Name "ProductDocumentRaw does not return binary data for .svg" `
+            -Condition ($null -eq $rawSvg.BinaryData) `
+            -Message "SVG should use TextContent, not BinaryData"
+
+        $rawTxt = Get-ProductDocumentRaw -Name "notes.txt"
+        Assert-True -Name "ProductDocumentRaw finds .txt file" `
+            -Condition ($rawTxt.Found -eq $true) `
+            -Message "Get-ProductDocumentRaw did not find notes.txt"
+        Assert-Equal -Name "ProductDocumentRaw returns text/plain MIME type for .txt" `
+            -Expected "text/plain; charset=utf-8" `
+            -Actual $rawTxt.MimeType
+        Assert-True -Name "ProductDocumentRaw returns text content for .txt" `
+            -Condition ($null -ne $rawTxt.TextContent -and $rawTxt.TextContent -match 'Plain text content') `
+            -Message "Expected text content for notes.txt"
+
+        $rawMissing = Get-ProductDocumentRaw -Name "nonexistent.png"
+        Assert-True -Name "ProductDocumentRaw returns Found=false for missing file" `
+            -Condition ($rawMissing.Found -eq $false) `
+            -Message "Expected Found=false for nonexistent file"
+
+        $rawTraversal = Get-ProductDocumentRaw -Name "../secrets.png"
+        Assert-True -Name "ProductDocumentRaw blocks path traversal" `
+            -Condition ($rawTraversal.Found -eq $false) `
+            -Message "Path traversal should return not found"
 
         # ═════════════════════════════════════════════════════════════════
         # Get-KickstartStatus — script-phase probe + process-type filter
