@@ -1313,7 +1313,11 @@ try {
         $gnTaskId = $gnObj.task_id
     }
 
-    # Test 1: task_get_next returns a todo task
+    Assert-True -Name "task_create for get_next test succeeds" `
+        -Condition ($null -ne $gnTaskId) `
+        -Message "Failed to create test task for get_next tests"
+
+    # task_get_next returns a todo task
     $requestId++
     $getNextResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1331,9 +1335,9 @@ try {
     }
     Assert-True -Name "task_get_next returns a todo task" `
         -Condition ($null -ne $getNextObj -and $getNextObj.success -eq $true -and $null -ne $getNextObj.task) `
-        -Message "Expected success with a task, got: $($getNextResponse.result.content[0].text)"
+        -Message "Expected success with a task"
 
-    # Test 2: task_get_next prefers analysed over todo (default)
+    # task_get_next prefers analysed over todo (default)
     $requestId++
     $gnAnalysedCreate = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1400,7 +1404,7 @@ try {
             -Condition ($null -ne $preferAnalysedObj -and $preferAnalysedObj.task.id -eq $gnAnalysedTaskId) `
             -Message "Expected analysed task $gnAnalysedTaskId, got: $($preferAnalysedObj.task.id)"
 
-        # Test 3: task_get_next with prefer_analysed=false returns todo task
+        # task_get_next with prefer_analysed=false returns todo task
         $requestId++
         $todoOnlyResponse = Send-McpRequest -Process $mcpProcess -Request @{
             jsonrpc = '2.0'
@@ -1421,7 +1425,7 @@ try {
             -Message "Expected a todo task (not $gnAnalysedTaskId)"
     }
 
-    # Test 4: task_get_next returns highest priority task
+    # task_get_next returns highest priority task
     $requestId++
     $highPrioCreate = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1462,7 +1466,7 @@ try {
         -Condition ($null -ne $prioNextObj -and $null -ne $prioNextObj.task -and $prioNextObj.task.id -eq $highPrioId -and $prioNextObj.task.priority -eq 1) `
         -Message "Expected task $highPrioId with priority=1, got task $($prioNextObj.task.id) with priority=$($prioNextObj.task.priority)"
 
-    # Test 5: task_get_next returns null when queue is empty
+    # task_get_next returns null when queue is empty
     $requestId++
     $allTasksResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1551,7 +1555,7 @@ try {
         $maTaskId = ($maCreateResponse.result.content[0].text | ConvertFrom-Json).task_id
     }
 
-    # Test 7: task_mark_analysing transitions todo → analysing
+    # task_mark_analysing transitions todo → analysing
     if ($maTaskId) {
         $requestId++
         $analysingResponse = Send-McpRequest -Process $mcpProcess -Request @{
@@ -1572,12 +1576,12 @@ try {
             -Condition ($null -ne $analysingObj -and $analysingObj.success -eq $true -and $analysingObj.new_status -eq 'analysing') `
             -Message "Expected new_status=analysing, got: $($analysingObj.new_status)"
 
-        # Test 8: task_mark_analysing sets analysis_started_at
+        # task_mark_analysing sets analysis_started_at
         Assert-True -Name "task_mark_analysing sets analysis_started_at" `
             -Condition ($null -ne $analysingObj -and $null -ne $analysingObj.analysis_started_at) `
             -Message "Expected analysis_started_at timestamp"
 
-        # Test 9: task_mark_analysing is idempotent
+        # task_mark_analysing is idempotent
         $requestId++
         $idempotentResponse = Send-McpRequest -Process $mcpProcess -Request @{
             jsonrpc = '2.0'
@@ -1598,7 +1602,7 @@ try {
             -Message "Expected success with already-in-state message"
     }
 
-    # Test 10: task_mark_analysing rejects missing task_id
+    # task_mark_analysing rejects missing task_id
     $requestId++
     $noIdResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1613,7 +1617,7 @@ try {
         -Condition ($null -ne $noIdResponse -and $null -ne $noIdResponse.error) `
         -Message "Expected error for missing task_id"
 
-    # Test 11: task_mark_analysing rejects non-existent task
+    # task_mark_analysing rejects non-existent task
     $requestId++
     $fakeIdResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1628,7 +1632,7 @@ try {
         -Condition ($null -ne $fakeIdResponse -and $null -ne $fakeIdResponse.error) `
         -Message "Expected error for non-existent task"
 
-    # Test 12: task_mark_analysing rejects task in done state
+    # task_mark_analysing rejects task in done state
     $requestId++
     $doneForReject = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1672,7 +1676,7 @@ try {
     Write-Host "  TASK_MARK_ANALYSED" -ForegroundColor Cyan
     Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
 
-    # Test 13: task_mark_analysed transitions analysing → analysed
+    # task_mark_analysed transitions analysing → analysed
     if ($maTaskId) {
         $requestId++
         $analysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
@@ -1701,7 +1705,7 @@ try {
             -Condition ($null -ne $analysedObj -and $analysedObj.success -eq $true -and $analysedObj.new_status -eq 'analysed') `
             -Message "Expected new_status=analysed, got: $($analysedObj.new_status)"
 
-        # Test 14: task_mark_analysed stores analysis data
+        # task_mark_analysed stores analysis data
         if ($analysedObj -and $analysedObj.file_path -and (Test-Path $analysedObj.file_path)) {
             $analysedContent = Get-Content $analysedObj.file_path -Raw | ConvertFrom-Json
             Assert-True -Name "task_mark_analysed stores analysis data" `
@@ -1711,12 +1715,12 @@ try {
             Write-TestResult -Name "task_mark_analysed stores analysis data" -Status Fail -Message "Task file not found"
         }
 
-        # Test 15: task_mark_analysed sets timestamps
+        # task_mark_analysed sets timestamps
         Assert-True -Name "task_mark_analysed sets analysis_completed_at" `
             -Condition ($null -ne $analysedObj -and $null -ne $analysedObj.analysis_completed_at) `
             -Message "Expected analysis_completed_at timestamp"
 
-        # Test 16: task_mark_analysed is idempotent (re-analyse updates data)
+        # task_mark_analysed is idempotent (re-analyse updates data)
         $requestId++
         $reanalysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
             jsonrpc = '2.0'
@@ -1747,7 +1751,7 @@ try {
         }
     }
 
-    # Test 17: task_mark_analysed rejects missing task_id
+    # task_mark_analysed rejects missing task_id
     $requestId++
     $noIdAnalysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1762,7 +1766,7 @@ try {
         -Condition ($null -ne $noIdAnalysedResponse -and $null -ne $noIdAnalysedResponse.error) `
         -Message "Expected error for missing task_id"
 
-    # Test 18: task_mark_analysed rejects missing analysis data
+    # task_mark_analysed rejects missing analysis data
     $requestId++
     $noAnalysisResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1777,7 +1781,7 @@ try {
         -Condition ($null -ne $noAnalysisResponse -and $null -ne $noAnalysisResponse.error) `
         -Message "Expected error for missing analysis"
 
-    # Test 19: task_mark_analysed rejects task in todo state
+    # task_mark_analysed rejects task in todo state
     $requestId++
     $todoForAnalysedReject = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1818,7 +1822,7 @@ try {
     Write-Host "  TASK_GET_CONTEXT" -ForegroundColor Cyan
     Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
 
-    # Test 20: task_get_context returns context for analysed task
+    # task_get_context returns context for analysed task
     if ($maTaskId) {
         $requestId++
         $contextResponse = Send-McpRequest -Process $mcpProcess -Request @{
@@ -1839,13 +1843,13 @@ try {
             -Condition ($null -ne $contextObj -and $contextObj.success -eq $true -and $contextObj.has_analysis -eq $true) `
             -Message "Expected success with has_analysis=true"
 
-        # Test 21: task_get_context includes task fields
+        # task_get_context includes task fields
         Assert-True -Name "task_get_context includes task fields" `
             -Condition ($null -ne $contextObj -and $null -ne $contextObj.task -and $null -ne $contextObj.task.name -and $null -ne $contextObj.task.description) `
             -Message "Expected task.name and task.description in context"
     }
 
-    # Test 22: task_get_context returns minimal context without analysis
+    # task_get_context returns minimal context without analysis
     $requestId++
     $noAnalysisCreate = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1888,7 +1892,7 @@ try {
             -Message "Expected has_analysis=false for task without analysis"
     }
 
-    # Test 23: task_get_context works for in-progress task
+    # task_get_context works for in-progress task
     if ($maTaskId) {
         $requestId++
         Send-McpRequest -Process $mcpProcess -Request @{
@@ -1916,7 +1920,7 @@ try {
             -Message "Expected success with status=in-progress"
     }
 
-    # Test 24: task_get_context rejects missing task_id
+    # task_get_context rejects missing task_id
     $requestId++
     $noIdContextResponse = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
@@ -1931,7 +1935,7 @@ try {
         -Condition ($null -ne $noIdContextResponse -and $null -ne $noIdContextResponse.error) `
         -Message "Expected error for missing task_id"
 
-    # Test 25: task_get_context rejects task not in analysed/in-progress
+    # task_get_context rejects task not in analysed/in-progress
     if ($todoForAnalysedId) {
         $requestId++
         $todoContextResponse = Send-McpRequest -Process $mcpProcess -Request @{
@@ -1957,7 +1961,7 @@ try {
     Write-Host "  FULL WORKFLOW LIFECYCLE" -ForegroundColor Cyan
     Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
 
-    # Test 26: End-to-end autonomous lifecycle
+    # End-to-end autonomous lifecycle
     $requestId++
     $e2eCreate = Send-McpRequest -Process $mcpProcess -Request @{
         jsonrpc = '2.0'
