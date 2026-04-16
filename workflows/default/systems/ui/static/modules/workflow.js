@@ -252,13 +252,11 @@ function renderWorkflowTaskProgress(workflows) {
     const container = document.getElementById('relationship-tree');
     if (!container) return;
 
-    // Remove existing sections
-    const existing = container.querySelector('.kickstart-phases');
-    if (existing) existing.remove();
+    // Always clean up previous renders (legacy kickstart + our own wrapper)
+    const existingLegacy = container.querySelector('.kickstart-phases');
+    if (existingLegacy) existingLegacy.remove();
 
-    if (!workflows || workflows.length === 0) return;
-
-    // Preserve per-workflow collapsed state from previous render
+    // Preserve collapsed state before removing
     const prevCollapsed = {};
     container.querySelectorAll('.wf-accordion-section').forEach(section => {
         const name = section.dataset.workflow;
@@ -267,6 +265,8 @@ function renderWorkflowTaskProgress(workflows) {
     const existingWrapper = container.querySelector('.workflow-task-progress');
     const wrapperWasCollapsed = existingWrapper ? existingWrapper.classList.contains('collapsed') : false;
     if (existingWrapper) existingWrapper.remove();
+
+    if (!workflows || workflows.length === 0) return;
 
     const taskStatusIcons = {
         'done':        '<span class="phase-icon phase-completed">&#10003;</span>',

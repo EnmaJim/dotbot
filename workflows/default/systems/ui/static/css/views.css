@@ -1628,7 +1628,8 @@
     padding-bottom: 12px;
 }
 
-.kickstart-phases.collapsed .chain-layer-items {
+.kickstart-phases.collapsed .chain-layer-items,
+.workflow-task-progress.collapsed .chain-layer-items {
     display: none;
 }
 

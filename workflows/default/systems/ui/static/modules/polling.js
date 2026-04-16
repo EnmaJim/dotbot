@@ -112,9 +112,7 @@ function updateWorkflowTabProgress(state) {
     try {
         if (state && typeof buildWorkflowPanelData === 'function' && typeof renderWorkflowTaskProgress === 'function') {
             const panelData = buildWorkflowPanelData(state);
-            if (panelData && panelData.length > 0) {
-                renderWorkflowTaskProgress(panelData);
-            }
+            renderWorkflowTaskProgress(panelData || []);
         }
     } catch (error) {
         // Silently ignore — non-critical
