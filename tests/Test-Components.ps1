@@ -1281,6 +1281,765 @@ try {
         -Condition ($null -ne $sessionStatsResponse) `
         -Message "No response"
 
+    Write-Host ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # TASK_GET_NEXT
+    # ═══════════════════════════════════════════════════════════════════
+
+    Write-Host "  TASK_GET_NEXT" -ForegroundColor Cyan
+    Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+    # Create a fresh task for get_next tests
+    $requestId++
+    $gnCreateResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{
+                name        = 'GetNext Test Task'
+                description = 'Task for testing task_get_next'
+                category    = 'feature'
+                priority    = 5
+                effort      = 'S'
+            }
+        }
+    }
+    $gnTaskId = $null
+    if ($gnCreateResponse -and $gnCreateResponse.result) {
+        $gnObj = $gnCreateResponse.result.content[0].text | ConvertFrom-Json
+        $gnTaskId = $gnObj.task_id
+    }
+
+    Assert-True -Name "task_create for get_next test succeeds" `
+        -Condition ($null -ne $gnTaskId) `
+        -Message "Failed to create test task for get_next tests"
+
+    # task_get_next returns a todo task
+    $requestId++
+    $getNextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_get_next'
+            arguments = @{ prefer_analysed = $false }
+        }
+    }
+
+    $getNextObj = $null
+    if ($getNextResponse -and $getNextResponse.result) {
+        $getNextObj = $getNextResponse.result.content[0].text | ConvertFrom-Json
+    }
+    Assert-True -Name "task_get_next returns a todo task" `
+        -Condition ($null -ne $getNextObj -and $getNextObj.success -eq $true -and $null -ne $getNextObj.task) `
+        -Message "Expected success with a task"
+
+    # task_get_next prefers analysed over todo (default)
+    $requestId++
+    $gnAnalysedCreate = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{
+                name        = 'Analysed Priority Task'
+                description = 'Should be preferred by get_next'
+                category    = 'feature'
+                priority    = 1
+                effort      = 'S'
+            }
+        }
+    }
+    $gnAnalysedTaskId = $null
+    if ($gnAnalysedCreate -and $gnAnalysedCreate.result) {
+        $gnAnalysedTaskId = ($gnAnalysedCreate.result.content[0].text | ConvertFrom-Json).task_id
+    }
+
+    if ($gnAnalysedTaskId) {
+        $requestId++
+        Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysing'
+                arguments = @{ task_id = $gnAnalysedTaskId }
+            }
+        } | Out-Null
+
+        $requestId++
+        Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysed'
+                arguments = @{
+                    task_id  = $gnAnalysedTaskId
+                    analysis = @{ summary = 'Test analysis'; files = @() }
+                }
+            }
+        } | Out-Null
+
+        $requestId++
+        $preferAnalysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_get_next'
+                arguments = @{}
+            }
+        }
+
+        $preferAnalysedObj = $null
+        if ($preferAnalysedResponse -and $preferAnalysedResponse.result) {
+            $preferAnalysedObj = $preferAnalysedResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_get_next prefers analysed tasks (default)" `
+            -Condition ($null -ne $preferAnalysedObj -and $preferAnalysedObj.task.id -eq $gnAnalysedTaskId) `
+            -Message "Expected analysed task $gnAnalysedTaskId, got: $($preferAnalysedObj.task.id)"
+
+        # task_get_next with prefer_analysed=false returns todo task
+        $requestId++
+        $todoOnlyResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_get_next'
+                arguments = @{ prefer_analysed = $false }
+            }
+        }
+
+        $todoOnlyObj = $null
+        if ($todoOnlyResponse -and $todoOnlyResponse.result) {
+            $todoOnlyObj = $todoOnlyResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_get_next with prefer_analysed=false returns todo task" `
+            -Condition ($null -ne $todoOnlyObj -and $null -ne $todoOnlyObj.task -and $todoOnlyObj.task.id -ne $gnAnalysedTaskId) `
+            -Message "Expected a todo task (not $gnAnalysedTaskId)"
+    }
+
+    # task_get_next returns highest priority task
+    $requestId++
+    $highPrioCreate = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{
+                name        = 'High Priority Task'
+                description = 'Priority 1 should come first'
+                category    = 'feature'
+                priority    = 1
+                effort      = 'S'
+            }
+        }
+    }
+    $highPrioId = $null
+    if ($highPrioCreate -and $highPrioCreate.result) {
+        $highPrioId = ($highPrioCreate.result.content[0].text | ConvertFrom-Json).task_id
+    }
+
+    $requestId++
+    $prioNextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_get_next'
+            arguments = @{ prefer_analysed = $false }
+        }
+    }
+
+    $prioNextObj = $null
+    if ($prioNextResponse -and $prioNextResponse.result) {
+        $prioNextObj = $prioNextResponse.result.content[0].text | ConvertFrom-Json
+    }
+    Assert-True -Name "task_get_next returns highest priority task first" `
+        -Condition ($null -ne $prioNextObj -and $null -ne $prioNextObj.task -and $prioNextObj.task.id -eq $highPrioId -and $prioNextObj.task.priority -eq 1) `
+        -Message "Expected task $highPrioId with priority=1, got task $($prioNextObj.task.id) with priority=$($prioNextObj.task.priority)"
+
+    # task_get_next returns null when queue is empty
+    $requestId++
+    $allTasksResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_list'
+            arguments = @{}
+        }
+    }
+    if ($allTasksResponse -and $allTasksResponse.result) {
+        $allTasksObj = $allTasksResponse.result.content[0].text | ConvertFrom-Json
+        if ($allTasksObj.tasks) {
+            foreach ($t in $allTasksObj.tasks) {
+                if ($t.status -eq 'todo' -or $t.status -eq 'analysed') {
+                    if ($t.status -eq 'todo') {
+                        $requestId++
+                        Send-McpRequest -Process $mcpProcess -Request @{
+                            jsonrpc = '2.0'; id = $requestId; method = 'tools/call'
+                            params = @{ name = 'task_mark_in_progress'; arguments = @{ task_id = $t.id } }
+                        } | Out-Null
+                    }
+                    if ($t.status -eq 'analysed') {
+                        $requestId++
+                        Send-McpRequest -Process $mcpProcess -Request @{
+                            jsonrpc = '2.0'; id = $requestId; method = 'tools/call'
+                            params = @{ name = 'task_mark_in_progress'; arguments = @{ task_id = $t.id } }
+                        } | Out-Null
+                    }
+                    $requestId++
+                    Send-McpRequest -Process $mcpProcess -Request @{
+                        jsonrpc = '2.0'; id = $requestId; method = 'tools/call'
+                        params = @{ name = 'task_mark_done'; arguments = @{ task_id = $t.id } }
+                    } | Out-Null
+                }
+            }
+        }
+    }
+
+    $requestId++
+    $emptyQueueResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_get_next'
+            arguments = @{ prefer_analysed = $false }
+        }
+    }
+
+    $emptyQueueObj = $null
+    if ($emptyQueueResponse -and $emptyQueueResponse.result) {
+        $emptyQueueObj = $emptyQueueResponse.result.content[0].text | ConvertFrom-Json
+    }
+    Assert-True -Name "task_get_next returns null when all remaining tasks are terminal" `
+        -Condition ($null -ne $emptyQueueObj -and $emptyQueueObj.success -eq $true -and $null -eq $emptyQueueObj.task) `
+        -Message "Expected success with null task when no non-terminal tasks remain"
+
+    Write-Host ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # TASK_MARK_ANALYSING
+    # ═══════════════════════════════════════════════════════════════════
+
+    Write-Host "  TASK_MARK_ANALYSING" -ForegroundColor Cyan
+    Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+    $requestId++
+    $maCreateResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{
+                name        = 'Analysing Test Task'
+                description = 'Task for testing mark_analysing'
+                category    = 'feature'
+                priority    = 5
+                effort      = 'S'
+            }
+        }
+    }
+    $maTaskId = $null
+    if ($maCreateResponse -and $maCreateResponse.result) {
+        $maTaskId = ($maCreateResponse.result.content[0].text | ConvertFrom-Json).task_id
+    }
+
+    # task_mark_analysing transitions todo → analysing
+    if ($maTaskId) {
+        $requestId++
+        $analysingResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysing'
+                arguments = @{ task_id = $maTaskId }
+            }
+        }
+
+        $analysingObj = $null
+        if ($analysingResponse -and $analysingResponse.result) {
+            $analysingObj = $analysingResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_mark_analysing transitions todo to analysing" `
+            -Condition ($null -ne $analysingObj -and $analysingObj.success -eq $true -and $analysingObj.new_status -eq 'analysing') `
+            -Message "Expected new_status=analysing, got: $($analysingObj.new_status)"
+
+        # task_mark_analysing sets analysis_started_at
+        Assert-True -Name "task_mark_analysing sets analysis_started_at" `
+            -Condition ($null -ne $analysingObj -and $null -ne $analysingObj.analysis_started_at) `
+            -Message "Expected analysis_started_at timestamp"
+
+        # task_mark_analysing is idempotent
+        $requestId++
+        $idempotentResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysing'
+                arguments = @{ task_id = $maTaskId }
+            }
+        }
+
+        $idempotentObj = $null
+        if ($idempotentResponse -and $idempotentResponse.result) {
+            $idempotentObj = $idempotentResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_mark_analysing is idempotent (already analysing)" `
+            -Condition ($null -ne $idempotentObj -and $idempotentObj.success -eq $true -and $idempotentObj.message -like '*already*') `
+            -Message "Expected success with already-in-state message"
+    }
+
+    # task_mark_analysing rejects missing task_id
+    $requestId++
+    $noIdResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_mark_analysing'
+            arguments = @{}
+        }
+    }
+    Assert-True -Name "task_mark_analysing rejects missing task_id" `
+        -Condition ($null -ne $noIdResponse -and $null -ne $noIdResponse.error) `
+        -Message "Expected error for missing task_id"
+
+    # task_mark_analysing rejects non-existent task
+    $requestId++
+    $fakeIdResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_mark_analysing'
+            arguments = @{ task_id = 'non-existent-task-id-12345' }
+        }
+    }
+    Assert-True -Name "task_mark_analysing rejects non-existent task" `
+        -Condition ($null -ne $fakeIdResponse -and $null -ne $fakeIdResponse.error) `
+        -Message "Expected error for non-existent task"
+
+    # task_mark_analysing rejects task in done state
+    $requestId++
+    $doneForReject = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{ name = 'Done Task For Reject'; description = 'Will be moved to done'; category = 'feature'; priority = 10; effort = 'XS' }
+        }
+    }
+    $doneRejectId = $null
+    if ($doneForReject -and $doneForReject.result) { $doneRejectId = ($doneForReject.result.content[0].text | ConvertFrom-Json).task_id }
+
+    if ($doneRejectId) {
+        $requestId++
+        Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_mark_in_progress'; arguments = @{ task_id = $doneRejectId } } } | Out-Null
+        $requestId++
+        Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_mark_done'; arguments = @{ task_id = $doneRejectId } } } | Out-Null
+
+        $requestId++
+        $doneAnalysingResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysing'
+                arguments = @{ task_id = $doneRejectId }
+            }
+        }
+        Assert-True -Name "task_mark_analysing rejects task in done state" `
+            -Condition ($null -ne $doneAnalysingResponse -and $null -ne $doneAnalysingResponse.error) `
+            -Message "Expected error for done task"
+    }
+
+    Write-Host ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # TASK_MARK_ANALYSED
+    # ═══════════════════════════════════════════════════════════════════
+
+    Write-Host "  TASK_MARK_ANALYSED" -ForegroundColor Cyan
+    Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+    # task_mark_analysed transitions analysing → analysed
+    if ($maTaskId) {
+        $requestId++
+        $analysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysed'
+                arguments = @{
+                    task_id  = $maTaskId
+                    analysis = @{
+                        summary        = 'Test analysis summary'
+                        files          = @('src/main.ps1', 'src/utils.ps1')
+                        entities       = @('TaskStore', 'MCP Server')
+                        implementation = @{ approach = 'Modify existing module'; risks = @('Breaking change to API') }
+                    }
+                }
+            }
+        }
+
+        $analysedObj = $null
+        if ($analysedResponse -and $analysedResponse.result) {
+            $analysedObj = $analysedResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_mark_analysed transitions analysing to analysed" `
+            -Condition ($null -ne $analysedObj -and $analysedObj.success -eq $true -and $analysedObj.new_status -eq 'analysed') `
+            -Message "Expected new_status=analysed, got: $($analysedObj.new_status)"
+
+        # task_mark_analysed stores analysis data
+        if ($analysedObj -and $analysedObj.file_path -and (Test-Path $analysedObj.file_path)) {
+            $analysedContent = Get-Content $analysedObj.file_path -Raw | ConvertFrom-Json
+            Assert-True -Name "task_mark_analysed stores analysis data" `
+                -Condition ($null -ne $analysedContent.analysis -and $analysedContent.analysis.summary -eq 'Test analysis summary') `
+                -Message "Expected analysis.summary='Test analysis summary'"
+        } else {
+            Write-TestResult -Name "task_mark_analysed stores analysis data" -Status Fail -Message "Task file not found"
+        }
+
+        # task_mark_analysed sets timestamps
+        Assert-True -Name "task_mark_analysed sets analysis_completed_at" `
+            -Condition ($null -ne $analysedObj -and $null -ne $analysedObj.analysis_completed_at) `
+            -Message "Expected analysis_completed_at timestamp"
+
+        # task_mark_analysed is idempotent (re-analyse updates data)
+        $requestId++
+        $reanalysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysed'
+                arguments = @{
+                    task_id  = $maTaskId
+                    analysis = @{ summary = 'Updated analysis summary'; files = @('src/updated.ps1') }
+                }
+            }
+        }
+
+        $reanalysedObj = $null
+        if ($reanalysedResponse -and $reanalysedResponse.result) {
+            $reanalysedObj = $reanalysedResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_mark_analysed is idempotent (re-analyse updates data)" `
+            -Condition ($null -ne $reanalysedObj -and $reanalysedObj.success -eq $true) `
+            -Message "Expected success on re-analyse"
+
+        if ($reanalysedObj -and $reanalysedObj.file_path -and (Test-Path $reanalysedObj.file_path)) {
+            $updatedContent = Get-Content $reanalysedObj.file_path -Raw | ConvertFrom-Json
+            Assert-True -Name "task_mark_analysed re-analyse updates analysis content" `
+                -Condition ($updatedContent.analysis.summary -eq 'Updated analysis summary') `
+                -Message "Expected updated summary, got: $($updatedContent.analysis.summary)"
+        }
+    }
+
+    # task_mark_analysed rejects missing task_id
+    $requestId++
+    $noIdAnalysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_mark_analysed'
+            arguments = @{ analysis = @{ summary = 'No task id' } }
+        }
+    }
+    Assert-True -Name "task_mark_analysed rejects missing task_id" `
+        -Condition ($null -ne $noIdAnalysedResponse -and $null -ne $noIdAnalysedResponse.error) `
+        -Message "Expected error for missing task_id"
+
+    # task_mark_analysed rejects missing analysis data
+    $requestId++
+    $noAnalysisResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_mark_analysed'
+            arguments = @{ task_id = $maTaskId }
+        }
+    }
+    Assert-True -Name "task_mark_analysed rejects missing analysis data" `
+        -Condition ($null -ne $noAnalysisResponse -and $null -ne $noAnalysisResponse.error) `
+        -Message "Expected error for missing analysis"
+
+    # task_mark_analysed rejects task in todo state
+    $requestId++
+    $todoForAnalysedReject = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{ name = 'Todo Task For Analysed Reject'; description = 'Should not be markable as analysed'; category = 'feature'; priority = 10; effort = 'XS' }
+        }
+    }
+    $todoForAnalysedId = $null
+    if ($todoForAnalysedReject -and $todoForAnalysedReject.result) {
+        $todoForAnalysedId = ($todoForAnalysedReject.result.content[0].text | ConvertFrom-Json).task_id
+    }
+
+    if ($todoForAnalysedId) {
+        $requestId++
+        $todoAnalysedResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_mark_analysed'
+                arguments = @{ task_id = $todoForAnalysedId; analysis = @{ summary = 'Should fail' } }
+            }
+        }
+        Assert-True -Name "task_mark_analysed rejects task in todo state" `
+            -Condition ($null -ne $todoAnalysedResponse -and $null -ne $todoAnalysedResponse.error) `
+            -Message "Expected error for todo task"
+    }
+
+    Write-Host ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # TASK_GET_CONTEXT
+    # ═══════════════════════════════════════════════════════════════════
+
+    Write-Host "  TASK_GET_CONTEXT" -ForegroundColor Cyan
+    Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+    # task_get_context returns context for analysed task
+    if ($maTaskId) {
+        $requestId++
+        $contextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_get_context'
+                arguments = @{ task_id = $maTaskId }
+            }
+        }
+
+        $contextObj = $null
+        if ($contextResponse -and $contextResponse.result) {
+            $contextObj = $contextResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_get_context returns context for analysed task" `
+            -Condition ($null -ne $contextObj -and $contextObj.success -eq $true -and $contextObj.has_analysis -eq $true) `
+            -Message "Expected success with has_analysis=true"
+
+        # task_get_context includes task fields
+        Assert-True -Name "task_get_context includes task fields" `
+            -Condition ($null -ne $contextObj -and $null -ne $contextObj.task -and $null -ne $contextObj.task.name -and $null -ne $contextObj.task.description) `
+            -Message "Expected task.name and task.description in context"
+    }
+
+    # task_get_context returns minimal context without analysis
+    $requestId++
+    $noAnalysisCreate = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{ name = 'No Analysis Context Task'; description = 'Task without analysis'; category = 'feature'; priority = 5; effort = 'S' }
+        }
+    }
+    $noAnalysisTaskId = $null
+    if ($noAnalysisCreate -and $noAnalysisCreate.result) {
+        $noAnalysisTaskId = ($noAnalysisCreate.result.content[0].text | ConvertFrom-Json).task_id
+    }
+
+    if ($noAnalysisTaskId) {
+        $requestId++
+        Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'; id = $requestId; method = 'tools/call'
+            params = @{ name = 'task_mark_in_progress'; arguments = @{ task_id = $noAnalysisTaskId } }
+        } | Out-Null
+
+        $requestId++
+        $minimalContextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_get_context'
+                arguments = @{ task_id = $noAnalysisTaskId }
+            }
+        }
+
+        $minimalContextObj = $null
+        if ($minimalContextResponse -and $minimalContextResponse.result) {
+            $minimalContextObj = $minimalContextResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_get_context returns minimal context without analysis" `
+            -Condition ($null -ne $minimalContextObj -and $minimalContextObj.success -eq $true -and $minimalContextObj.has_analysis -eq $false) `
+            -Message "Expected has_analysis=false for task without analysis"
+    }
+
+    # task_get_context works for in-progress task
+    if ($maTaskId) {
+        $requestId++
+        Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'; id = $requestId; method = 'tools/call'
+            params = @{ name = 'task_mark_in_progress'; arguments = @{ task_id = $maTaskId } }
+        } | Out-Null
+
+        $requestId++
+        $ipContextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_get_context'
+                arguments = @{ task_id = $maTaskId }
+            }
+        }
+
+        $ipContextObj = $null
+        if ($ipContextResponse -and $ipContextResponse.result) {
+            $ipContextObj = $ipContextResponse.result.content[0].text | ConvertFrom-Json
+        }
+        Assert-True -Name "task_get_context works for in-progress task" `
+            -Condition ($null -ne $ipContextObj -and $ipContextObj.success -eq $true -and $ipContextObj.status -eq 'in-progress') `
+            -Message "Expected success with status=in-progress"
+    }
+
+    # task_get_context rejects missing task_id
+    $requestId++
+    $noIdContextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_get_context'
+            arguments = @{}
+        }
+    }
+    Assert-True -Name "task_get_context rejects missing task_id" `
+        -Condition ($null -ne $noIdContextResponse -and $null -ne $noIdContextResponse.error) `
+        -Message "Expected error for missing task_id"
+
+    # task_get_context rejects task not in analysed/in-progress
+    if ($todoForAnalysedId) {
+        $requestId++
+        $todoContextResponse = Send-McpRequest -Process $mcpProcess -Request @{
+            jsonrpc = '2.0'
+            id      = $requestId
+            method  = 'tools/call'
+            params  = @{
+                name      = 'task_get_context'
+                arguments = @{ task_id = $todoForAnalysedId }
+            }
+        }
+        Assert-True -Name "task_get_context rejects task in todo state" `
+            -Condition ($null -ne $todoContextResponse -and $null -ne $todoContextResponse.error) `
+            -Message "Expected error for todo task"
+    }
+
+    Write-Host ""
+
+    # ═══════════════════════════════════════════════════════════════════
+    # FULL WORKFLOW LIFECYCLE
+    # ═══════════════════════════════════════════════════════════════════
+
+    Write-Host "  FULL WORKFLOW LIFECYCLE" -ForegroundColor Cyan
+    Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+    # End-to-end autonomous lifecycle
+    $requestId++
+    $e2eCreate = Send-McpRequest -Process $mcpProcess -Request @{
+        jsonrpc = '2.0'
+        id      = $requestId
+        method  = 'tools/call'
+        params  = @{
+            name      = 'task_create'
+            arguments = @{
+                name = 'E2E Lifecycle Task'
+                description = 'Full workflow: create > get_next > analysing > analysed > get_context > in_progress > done'
+                category = 'feature'; priority = 1; effort = 'M'
+                acceptance_criteria = @('Criterion 1', 'Criterion 2')
+                steps = @('Step 1', 'Step 2', 'Step 3')
+            }
+        }
+    }
+    $e2eTaskId = $null
+    $e2ePassed = $true
+    $e2eFailReason = ""
+
+    if ($e2eCreate -and $e2eCreate.result) { $e2eTaskId = ($e2eCreate.result.content[0].text | ConvertFrom-Json).task_id }
+    if (-not $e2eTaskId) { $e2ePassed = $false; $e2eFailReason = "Create failed" }
+
+    if ($e2ePassed) {
+        $requestId++
+        $e2eNext = Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_get_next'; arguments = @{ prefer_analysed = $false } } }
+        $e2eNextObj = $null
+        if ($e2eNext -and $e2eNext.result) { $e2eNextObj = $e2eNext.result.content[0].text | ConvertFrom-Json }
+        if (-not $e2eNextObj -or -not $e2eNextObj.task) { $e2ePassed = $false; $e2eFailReason = "get_next returned no task" }
+        elseif ($e2eNextObj.task.id -ne $e2eTaskId) { $e2ePassed = $false; $e2eFailReason = "get_next returned unexpected task $($e2eNextObj.task.id), expected $e2eTaskId" }
+    }
+
+    if ($e2ePassed) {
+        $requestId++
+        $e2eAnalysing = Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_mark_analysing'; arguments = @{ task_id = $e2eTaskId } } }
+        $e2eAnalysingObj = $null
+        if ($e2eAnalysing -and $e2eAnalysing.result) { $e2eAnalysingObj = $e2eAnalysing.result.content[0].text | ConvertFrom-Json }
+        if (-not $e2eAnalysingObj -or $e2eAnalysingObj.new_status -ne 'analysing') { $e2ePassed = $false; $e2eFailReason = "mark_analysing failed" }
+    }
+
+    if ($e2ePassed) {
+        $requestId++
+        $e2eAnalysed = Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_mark_analysed'; arguments = @{ task_id = $e2eTaskId; analysis = @{ summary = 'E2E analysis'; files = @('src/app.ps1'); entities = @('AppModule') } } } }
+        $e2eAnalysedObj = $null
+        if ($e2eAnalysed -and $e2eAnalysed.result) { $e2eAnalysedObj = $e2eAnalysed.result.content[0].text | ConvertFrom-Json }
+        if (-not $e2eAnalysedObj -or $e2eAnalysedObj.new_status -ne 'analysed') { $e2ePassed = $false; $e2eFailReason = "mark_analysed failed" }
+    }
+
+    if ($e2ePassed) {
+        $requestId++
+        $e2eContext = Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_get_context'; arguments = @{ task_id = $e2eTaskId } } }
+        $e2eContextObj = $null
+        if ($e2eContext -and $e2eContext.result) { $e2eContextObj = $e2eContext.result.content[0].text | ConvertFrom-Json }
+        if (-not $e2eContextObj -or $e2eContextObj.has_analysis -ne $true) { $e2ePassed = $false; $e2eFailReason = "get_context failed or missing analysis" }
+    }
+
+    if ($e2ePassed) {
+        $requestId++
+        $e2eProgress = Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_mark_in_progress'; arguments = @{ task_id = $e2eTaskId } } }
+        $e2eProgressObj = $null
+        if ($e2eProgress -and $e2eProgress.result) { $e2eProgressObj = $e2eProgress.result.content[0].text | ConvertFrom-Json }
+        if (-not $e2eProgressObj -or $e2eProgressObj.success -ne $true) { $e2ePassed = $false; $e2eFailReason = "mark_in_progress failed" }
+    }
+
+    if ($e2ePassed) {
+        $requestId++
+        $e2eDone = Send-McpRequest -Process $mcpProcess -Request @{ jsonrpc = '2.0'; id = $requestId; method = 'tools/call'; params = @{ name = 'task_mark_done'; arguments = @{ task_id = $e2eTaskId } } }
+        $e2eDoneObj = $null
+        if ($e2eDone -and $e2eDone.result) { $e2eDoneObj = $e2eDone.result.content[0].text | ConvertFrom-Json }
+        if (-not $e2eDoneObj -or $e2eDoneObj.success -ne $true) { $e2ePassed = $false; $e2eFailReason = "mark_done failed" }
+    }
+
+    Assert-True -Name "Full lifecycle: create > get_next > analysing > analysed > get_context > in_progress > done" `
+        -Condition $e2ePassed `
+        -Message "Lifecycle failed at: $e2eFailReason"
+
+    Write-Host ""
+
 } catch {
     Write-TestResult -Name "MCP server tests" -Status Fail -Message "Exception: $($_.Exception.Message)"
 } finally {
