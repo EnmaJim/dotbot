@@ -51,11 +51,6 @@ dotbot wraps AI-assisted coding in a managed, transparent workflow where every s
 - **[Playwright MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-playwright)** - Browser automation for UI testing and verification.
 - **[Context7 MCP](https://github.com/upstash/context7)** - Library documentation lookup to reduce hallucination.
 
-> **Windows ZIP download?** Run this first:
-> ```powershell
-> Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-> ```
-
 ## Quick Start
 
 ### 1. Install dotbot globally (one-time)
