@@ -194,7 +194,10 @@ jobs:
           # Rename to PascalCase for PSGallery convention
           Rename-Item "$staging/dotbot.psd1" "Dotbot.psd1"
           Rename-Item "$staging/dotbot.psm1" "Dotbot.psm1"
-          Update-ModuleManifest -Path "$staging/Dotbot.psd1" -RootModule 'Dotbot.psm1' -ModuleVersion $version
+          $psd1 = Get-Content "$staging/Dotbot.psd1" -Raw
+          $psd1 = $psd1 -replace "RootModule = 'dotbot.psm1'", "RootModule = 'Dotbot.psm1'"
+          $psd1 = $psd1 -replace "ModuleVersion = '.*?'", "ModuleVersion = '$version'"
+          $psd1 | Set-Content "$staging/Dotbot.psd1" -NoNewline
 
       - name: Publish
         shell: pwsh
