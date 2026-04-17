@@ -76,7 +76,7 @@ jobs:
   # ── Build release archives ─────────────────────────────────
   release:
     name: Create GitHub Release
-    # needs: test  # temporarily skipped
+    needs: test
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
