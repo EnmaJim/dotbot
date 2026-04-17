@@ -3,6 +3,19 @@
  * Handles new project detection and kickstart flow
  */
 
+// Default label and hint for the interview checkbox row.
+// These exist because server.ps1 defaults `show_interview` to `true` whenever
+// a workflow mode does not set it explicitly (e.g. the `has_docs` mode in
+// kickstart-from-scratch/workflow.yaml). When that happens the dialog arrives
+// with `show_interview: true` but no `interview_label` / `interview_hint`,
+// which previously rendered as a blank mystery checkbox
+// (bug-kickstart-from-scratch). These constants are used as fallbacks in the
+// reset phase so the row always carries meaningful text, and match the
+// default wording baked into index.html for #kickstart-interview-label and
+// #kickstart-interview-hint.
+const KICKSTART_DEFAULT_INTERVIEW_LABEL = 'Interview me to clarify requirements';
+const KICKSTART_DEFAULT_INTERVIEW_HINT = 'Dotbot will ask clarifying questions before creating product documents';
+
 // State
 let isNewProject = false;
 let kickstartInProgress = false;
@@ -321,8 +334,8 @@ function applyKickstartDialog(dialog, phases, mode) {
     // Reset dialog-controlled content before applying new values so a workflow
     // that omits a field does not inherit the previous workflow's text (#235).
     if (descEl) descEl.textContent = '';
-    if (labelEl) labelEl.textContent = '';
-    if (hintEl) hintEl.textContent = '';
+    if (labelEl) labelEl.textContent = KICKSTART_DEFAULT_INTERVIEW_LABEL;
+    if (hintEl) hintEl.textContent = KICKSTART_DEFAULT_INTERVIEW_HINT;
     if (promptEl) promptEl.placeholder = '';
 
     // Remove any auto-detect button injected on a previous apply so repeated
