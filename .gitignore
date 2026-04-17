@@ -21,6 +21,7 @@ Thumbs.db
 # Claude Code
 .claude/agents/
 .claude/settings.local.json
+.claude/worktrees/
 .claude/skills/*
 !.claude/skills/dotbot-code-review/
 !.claude/skills/design-system/
