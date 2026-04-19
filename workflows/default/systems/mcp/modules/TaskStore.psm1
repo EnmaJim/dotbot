@@ -97,7 +97,10 @@ function Get-TodoTaskRecord {
         [string]$TasksBaseDir
     )
 
-    $paths = Ensure-TodoDirectories -TasksBaseDir $TasksBaseDir
+    $paths = Get-TodoDirectories -TasksBaseDir $TasksBaseDir
+    if (-not (Test-Path -Path $paths.TodoDir -PathType Container)) {
+        return $null
+    }
     $files = Get-ChildItem -Path $paths.TodoDir -Filter "*.json" -File -ErrorAction SilentlyContinue
 
     foreach ($file in $files) {
