@@ -194,7 +194,6 @@ if (-not $dotbotInstalled) {
         Assert-PathExists -Name "workspace/sessions exists" -Path (Join-Path $botDir "workspace\sessions")
         Assert-PathExists -Name "workspace/plans exists" -Path (Join-Path $botDir "workspace\plans")
         Assert-PathExists -Name "workspace/product exists" -Path (Join-Path $botDir "workspace\product")
-        Assert-PathExists -Name "workspace/feedback exists" -Path (Join-Path $botDir "workspace\feedback")
 
         # Other directories
         Assert-PathExists -Name "hooks directory exists" -Path (Join-Path $botDir "hooks")

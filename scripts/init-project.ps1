@@ -284,10 +284,7 @@ $workspaceDirs = @(
     "workspace\sessions\runs",
     "workspace\sessions\history",
     "workspace\plans",
-    "workspace\product",
-    "workspace\feedback\pending",
-    "workspace\feedback\applied",
-    "workspace\feedback\archived"
+    "workspace\product"
 )
 
 foreach ($dir in $workspaceDirs) {

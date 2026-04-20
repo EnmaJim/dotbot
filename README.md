@@ -34,7 +34,7 @@ dotbot wraps AI-assisted coding in a managed, transparent workflow where every s
 - **Operator steering** - Guide the AI mid-session through a heartbeat/whisper system. `/status` and `/verify` slash commands work during autonomous execution.
 - **Kickstart interview** - Guided requirements-gathering flow that produces product documents, then generates a task roadmap automatically.
 - **Human-in-the-loop Q&A** - When a task needs human input, dotbot routes questions to stakeholders via **Teams**, **Email**, or **Jira**.
-- **Designed for teams** - The entire `.bot/` directory lives in your repo. Task queues, session histories, plans, and feedback are visible to everyone through git.
+- **Designed for teams** - The entire `.bot/` directory lives in your repo. Task queues, session histories, and plans are visible to everyone through git.
 
 ### Foundation
 - **Zero-dependency tooling** - MCP server and web UI are pure PowerShell. No npm, pip, or Docker required. Cross-platform on Windows, macOS, and Linux.
@@ -201,7 +201,6 @@ Update-Module Dotbot
 │   ├── sessions/       # Session history + run logs
 │   ├── product/        # Product docs (mission, tech stack, entity model)
 │   ├── plans/          # Execution plans
-│   ├── feedback/       # Structured problem logs (pending/applied/archived)
 │   └── reports/        # Generated reports
 ├── hooks/              # Project-specific scripts (dev, verify, steering)
 ├── init.ps1            # IDE integration setup
