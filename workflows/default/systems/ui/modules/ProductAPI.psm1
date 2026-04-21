@@ -34,7 +34,7 @@ function Resolve-ProductDocumentInfo {
     )
 
     $relativePath = [System.IO.Path]::GetRelativePath($ProductDir, $File.FullName) -replace '\\', '/'
-    $ext = $File.Extension.ToLower()
+    $ext = $File.Extension.ToLowerInvariant()
     $isMd = $ext -eq '.md'
     $isJson = $ext -eq '.json'
     $isTxt = $ext -eq '.txt'
@@ -292,7 +292,7 @@ function Get-ProductDocumentRaw {
         return @{ Found = $false }
     }
 
-    $ext = [System.IO.Path]::GetExtension($resolvedDoc.FullPath).ToLower()
+    $ext = [System.IO.Path]::GetExtension($resolvedDoc.FullPath).ToLowerInvariant()
     $mimeType = switch ($ext) {
         '.png'  { 'image/png' }
         '.jpg'  { 'image/jpeg' }

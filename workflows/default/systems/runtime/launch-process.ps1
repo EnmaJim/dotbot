@@ -342,7 +342,7 @@ $procFilePath = Join-Path $processesDir "$procId.json"
 Write-Diag "Process file exists: $(Test-Path $procFilePath) at $procFilePath"
 
 # Banner
-Write-Card -Title "PROCESS: $($Type.ToUpper())" -Width 50 -BorderStyle Rounded -BorderColor Label -TitleColor Label -Lines @(
+Write-Card -Title "PROCESS: $($Type.ToUpperInvariant())" -Width 50 -BorderStyle Rounded -BorderColor Label -TitleColor Label -Lines @(
     "$($t.Label)ID:$($t.Reset)    $($t.Cyan)$procId$($t.Reset)"
     "$($t.Label)Model:$($t.Reset) $($t.Purple)$Model$($t.Reset)"
     "$($t.Label)Type:$($t.Reset)  $($t.Amber)$Type$($t.Reset)"

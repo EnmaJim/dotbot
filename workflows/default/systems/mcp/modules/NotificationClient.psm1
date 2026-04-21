@@ -166,7 +166,7 @@ function Send-ServerNotification {
         }
     }
     if (-not $projectId) {
-        $projectId = ($projectName.ToLower() -replace '[^a-z0-9]+', '-').Trim('-')
+        $projectId = ($projectName.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
     }
 
     # Deterministic UUIDv5-style GUID from composite key for idempotent retries
@@ -420,7 +420,7 @@ function Get-TaskNotificationResponse {
         }
         if (-not $projectId) {
             $projectName = if ($Settings.project_name) { $Settings.project_name } else { "dotbot" }
-            $projectId = ($projectName.ToLower() -replace '[^a-z0-9]+', '-').Trim('-')
+            $projectId = ($projectName.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
         }
     }
 

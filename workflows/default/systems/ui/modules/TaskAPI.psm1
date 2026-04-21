@@ -401,7 +401,7 @@ function Submit-TaskAnswer {
 
             foreach ($att in @($Attachments)) {
                 $safeName = [System.IO.Path]::GetFileName($att.name)
-                $ext = [System.IO.Path]::GetExtension($safeName).ToLower()
+                $ext = [System.IO.Path]::GetExtension($safeName).ToLowerInvariant()
                 if ($ext -notin $allowedExtensions) {
                     Write-DotbotWarning "Skipping attachment '$safeName': unsupported extension '$ext'"
                     continue

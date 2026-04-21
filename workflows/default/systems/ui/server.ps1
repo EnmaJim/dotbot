@@ -1640,7 +1640,7 @@ $docContext
                                             }
                                             foreach ($att in @($ans.attachments)) {
                                                 $safeName = [System.IO.Path]::GetFileName($att.name)
-                                                $ext = [System.IO.Path]::GetExtension($safeName).ToLower()
+                                                $ext = [System.IO.Path]::GetExtension($safeName).ToLowerInvariant()
                                                 if ($ext -notin $allowedAttachExtensions) { continue }
                                                 try {
                                                     $bytes = [System.Convert]::FromBase64String($att.content)
