@@ -155,5 +155,7 @@ jobs:
           DOTBOT_API_KEY: ${{ secrets.DOTBOT_API_KEY }}
           DOTBOT_TEAMS_RECIPIENT: ${{ secrets.DOTBOT_TEAMS_RECIPIENT }}
           DOTBOT_EMAIL_RECIPIENT: ${{ secrets.DOTBOT_EMAIL_RECIPIENT }}
+          DOTBOT_JIRA_ISSUE_KEY: ${{ secrets.DOTBOT_JIRA_ISSUE_KEY }}
+          DOTBOT_JIRA_EMAIL_RECIPIENT: ${{ secrets.DOTBOT_JIRA_EMAIL_RECIPIENT }}
         run: |
           pwsh -NoProfile -ExecutionPolicy Bypass -File tests/Run-Tests.ps1 -Layer 4

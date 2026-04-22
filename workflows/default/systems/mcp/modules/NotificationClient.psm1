@@ -45,6 +45,7 @@ function Get-NotificationSettings {
         sync_tasks             = $true
         sync_questions         = $true
         instance_id            = ""
+        jira_issue_key         = ""
     }
 
     $merged = Get-MergedSettings -BotRoot $BotRoot
@@ -225,6 +226,10 @@ function Send-ServerNotification {
         } else {
             $instanceReq.recipients.userObjectIds = $recipientIds
         }
+    }
+
+    if ($channel -eq "jira" -and $Settings.jira_issue_key) {
+        $instanceReq.jiraIssueKey = "$($Settings.jira_issue_key)"
     }
 
     try {
