@@ -151,5 +151,8 @@ jobs:
         shell: pwsh
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DOTBOT_SERVER_URL: ${{ secrets.DOTBOT_SERVER_URL }}
+          DOTBOT_API_KEY: ${{ secrets.DOTBOT_API_KEY }}
+          DOTBOT_TEAMS_RECIPIENT: ${{ secrets.DOTBOT_TEAMS_RECIPIENT }}
         run: |
           pwsh -NoProfile -ExecutionPolicy Bypass -File tests/Run-Tests.ps1 -Layer 4

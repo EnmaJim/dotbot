@@ -142,12 +142,16 @@ if (3 -in $layersToRun) {
     if ($exitCode -ne 0) { $overallFailed = $true }
 }
 
-# Layer 4: E2E Claude
+# Layer 4: E2E Claude + Teams Q&A
 if (4 -in $layersToRun) {
     & pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\Test-E2E-Claude.ps1"
-    $exitCode = $LASTEXITCODE
-    $layerResults["4"] = ($exitCode -eq 0)
-    if ($exitCode -ne 0) { $overallFailed = $true }
+    $claudeExit = $LASTEXITCODE
+
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\Test-E2E-Teams-QA.ps1"
+    $teamsExit = $LASTEXITCODE
+
+    $layerResults["4"] = ($claudeExit -eq 0 -and $teamsExit -eq 0)
+    if ($claudeExit -ne 0 -or $teamsExit -ne 0) { $overallFailed = $true }
 }
 
 # Overall summary

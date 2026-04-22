@@ -343,6 +343,104 @@ try
         return Results.File(stream, contentType, fileName);
     });
 
+    if (string.Equals(Environment.GetEnvironmentVariable("DOTBOT_TEST_MODE"), "true", StringComparison.OrdinalIgnoreCase))
+    {
+        Log.Warning("DOTBOT_TEST_MODE is enabled - /api/test/responses is live. Do not run this in production.");
+
+        app.MapPost("/api/test/responses", async (
+            HttpRequest request,
+            AttachmentStorageService attachments,
+            ResponseStorageService responses,
+            ILogger<Program> logger) =>
+        {
+            TestResponseRequest? body;
+            try
+            {
+                body = await request.ReadFromJsonAsync<TestResponseRequest>();
+            }
+            catch (JsonException ex)
+            {
+                return Results.BadRequest(new { error = "Invalid JSON: " + ex.Message });
+            }
+
+            if (body is null)
+            {
+                return Results.BadRequest(new { error = "Body is required" });
+            }
+            if (string.IsNullOrWhiteSpace(body.ProjectId))
+            {
+                return Results.BadRequest(new { error = "projectId is required" });
+            }
+            if (body.QuestionId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "questionId is required" });
+            }
+            if (body.InstanceId == Guid.Empty)
+            {
+                return Results.BadRequest(new { error = "instanceId is required" });
+            }
+            if (string.IsNullOrWhiteSpace(body.SelectedKey)
+                && string.IsNullOrWhiteSpace(body.FreeText)
+                && (body.Attachments is null || body.Attachments.Count == 0))
+            {
+                return Results.BadRequest(new { error = "At least one of selectedKey, freeText, or attachments is required" });
+            }
+
+            var responseId = Guid.NewGuid();
+            var attachmentRecords = new List<AttachmentRecord>();
+
+            if (body.Attachments is not null)
+            {
+                foreach (var att in body.Attachments)
+                {
+                    if (string.IsNullOrWhiteSpace(att.Name) || string.IsNullOrWhiteSpace(att.ContentBase64))
+                    {
+                        return Results.BadRequest(new { error = "Each attachment requires name and contentBase64" });
+                    }
+
+                    byte[] bytes;
+                    try
+                    {
+                        bytes = Convert.FromBase64String(att.ContentBase64);
+                    }
+                    catch (FormatException)
+                    {
+                        return Results.BadRequest(new { error = $"Attachment '{att.Name}' has invalid base64" });
+                    }
+
+                    using var ms = new MemoryStream(bytes);
+                    var record = await attachments.SaveAsync(responseId, att.Name, ms, bytes.LongLength);
+                    attachmentRecords.Add(record);
+                }
+            }
+
+            var record2 = new ResponseRecordV2
+            {
+                ResponseId = responseId,
+                InstanceId = body.InstanceId,
+                QuestionId = body.QuestionId,
+                QuestionVersion = body.QuestionVersion ?? 1,
+                ProjectId = body.ProjectId,
+                SelectedKey = string.IsNullOrWhiteSpace(body.SelectedKey) ? null : body.SelectedKey,
+                FreeText = string.IsNullOrWhiteSpace(body.FreeText) ? null : body.FreeText,
+                Attachments = attachmentRecords.Count > 0 ? attachmentRecords : null,
+                ResponderEmail = body.ResponderEmail,
+                ResponderAadObjectId = body.ResponderAadObjectId
+            };
+
+            await responses.SaveResponseAsync(record2);
+
+            logger.LogInformation("Test response injected: {ResponseId} for instance {InstanceId} with {AttachmentCount} attachment(s)",
+                responseId, body.InstanceId, attachmentRecords.Count);
+
+            return Results.Ok(new
+            {
+                responseId,
+                attachments = attachmentRecords.Select(a => new { a.Name, a.SizeBytes, a.BlobPath })
+            });
+        });
+    }
+
     // ── Revoke a device token (API key protected) ───────────────────────────
     app.MapPost("/tokens/revoke", async (HttpRequest request, TokenStorageService tokenStorage, ILogger<Program> logger) =>
     {
@@ -648,3 +746,16 @@ static void LogStartupConfiguration(WebApplicationBuilder builder)
 // Request models for minimal API endpoints
 record RevokeTokenRequest(string DeviceTokenId);
 record NudgeRequest(string ProjectId, string InstanceId, string RecipientEmail);
+
+record TestResponseRequest(
+    string ProjectId,
+    Guid QuestionId,
+    Guid InstanceId,
+    int? QuestionVersion,
+    string? SelectedKey,
+    string? FreeText,
+    string? ResponderEmail,
+    string? ResponderAadObjectId,
+    List<TestResponseAttachment>? Attachments);
+
+record TestResponseAttachment(string Name, string ContentBase64);
