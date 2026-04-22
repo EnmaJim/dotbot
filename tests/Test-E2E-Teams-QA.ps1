@@ -37,9 +37,18 @@ $teamsRecipient = $env:DOTBOT_TEAMS_RECIPIENT
 $teamsChannel   = if ($env:DOTBOT_TEAMS_CHANNEL) { $env:DOTBOT_TEAMS_CHANNEL } else { "teams" }
 
 $missing = @()
-if (-not $serverUrl)      { $missing += "DOTBOT_SERVER_URL" }
-if (-not $apiKey)         { $missing += "DOTBOT_API_KEY" }
-if (-not $teamsRecipient) { $missing += "DOTBOT_TEAMS_RECIPIENT" }
+
+if (-not $serverUrl) {
+    $missing += "DOTBOT_SERVER_URL"
+}
+
+if (-not $apiKey) {
+    $missing += "DOTBOT_API_KEY"
+}
+
+if (-not $teamsRecipient) {
+    $missing += "DOTBOT_TEAMS_RECIPIENT"
+}
 
 $dotbotInstalled = Test-Path (Join-Path $dotbotDir "workflows\default")
 if (-not $dotbotInstalled) {
@@ -133,7 +142,10 @@ function Invoke-TeamsRoundTrip {
         }
 
         $controlDir = Join-Path $botDir ".control"
-        if (-not (Test-Path $controlDir)) { New-Item -ItemType Directory -Force -Path $controlDir | Out-Null }
+        if (-not (Test-Path $controlDir)) {
+            New-Item -ItemType Directory -Force -Path $controlDir | Out-Null
+        }
+
         $instanceId = [guid]::NewGuid().ToString()
         $control = [ordered]@{
             instance_id = $instanceId
@@ -224,7 +236,9 @@ function Invoke-TeamsRoundTrip {
         $response = $null
         while ((Get-Date) -lt $deadline) {
             $response = Get-TaskNotificationResponse -Notification $notificationMeta -Settings $settings
-            if ($response) { break }
+            if ($response) {
+                break
+            }
             Start-Sleep -Milliseconds 500
         }
         if (-not $response) {
@@ -280,4 +294,7 @@ foreach ($f in $fixtures) {
 }
 
 $allPassed = Write-TestSummary -LayerName "Layer 4: E2E Teams Q&A"
-if (-not $allPassed) { exit 1 }
+
+if (-not $allPassed) {
+    exit 1
+}
