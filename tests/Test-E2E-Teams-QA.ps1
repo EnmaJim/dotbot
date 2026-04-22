@@ -247,6 +247,22 @@ function Invoke-TeamsRoundTrip {
         if (Test-Path $localFile) {
             $savedSize = (Get-Item $localFile).Length
             Assert-Equal -Name "Teams[$label]: saved byte size matches fixture" -Expected $fixtureSize -Actual $savedSize
+
+            $sourceHash = (Get-FileHash -Path $fixturePath -Algorithm SHA256).Hash
+            $savedHash  = (Get-FileHash -Path $localFile -Algorithm SHA256).Hash
+            Assert-Equal -Name "Teams[$label]: SHA-256 matches fixture" -Expected $sourceHash -Actual $savedHash
+        }
+
+        if ($env:DOTBOT_REQUIRE_REAL_DELIVERY -eq "true") {
+            try {
+                $instance = Invoke-RestMethod -Uri "$($ServerUrl.TrimEnd('/'))/api/instances/$($sendResult.project_id)/$($sendResult.instance_id)" `
+                    -Method Get -Headers @{ "X-Api-Key" = $ApiKey } -TimeoutSec 15
+                $delivered = @($instance.sentTo | Where-Object { $_.status -eq 'sent' -or $_.status -eq 'reminded' })
+                Assert-Equal -Name "Teams[$label]: delivered to >= 1 recipient (Tier 3)" `
+                    -Expected $true -Actual ($delivered.Count -ge 1)
+            } catch {
+                Write-TestResult -Name "Teams[$label]: real delivery assertion (Tier 3)" -Status Fail -Message $_.Exception.Message
+            }
         }
 
     } finally {
