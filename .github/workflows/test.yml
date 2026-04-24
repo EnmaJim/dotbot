@@ -139,6 +139,11 @@ jobs:
             Install-PSResource -Name powershell-yaml -Repository PSGallery -TrustRepository -Scope CurrentUser -Reinstall
           }
 
+      - name: Install dotbot globally
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File install.ps1
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
