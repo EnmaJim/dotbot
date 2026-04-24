@@ -9,8 +9,8 @@
     endpoint POST /api/test/responses, polls Get-TaskNotificationResponse,
     then asserts Resolve-NotificationAnswer downloads the attachment.
 
-    Required env: ANTHROPIC_API_KEY (or ~/.claude), DOTBOT_SERVER_URL,
-    DOTBOT_API_KEY, DOTBOT_TEAMS_RECIPIENT. Optional: DOTBOT_TEAMS_CHANNEL.
+    Required env: DOTBOT_SERVER_URL, DOTBOT_API_KEY,
+    DOTBOT_TEAMS_RECIPIENT. Optional: DOTBOT_TEAMS_CHANNEL.
     The server must be started with DOTBOT_TEST_MODE=true.
 #>
 
