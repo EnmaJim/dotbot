@@ -460,11 +460,31 @@ if ($sessionResult.success) {
 }
 Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Workflow child started (session: $sessionId, PID: $PID)"
 
-# Load both prompt templates
-$analysisTemplateFile = Join-Path $botRoot "recipes\prompts\98-analyse-task.md"
-$executionTemplateFile = Join-Path $botRoot "recipes\prompts\99-autonomous-task.md"
-$analysisPromptTemplate = Get-Content $analysisTemplateFile -Raw
-$executionPromptTemplate = Get-Content $executionTemplateFile -Raw
+# Load both prompt templates. Use multi-segment Join-Path to avoid embedding
+# backslashes that break on macOS/Linux, and make the reads terminating with
+# an explicit non-empty check so a missing or empty template fails fast at
+# startup instead of cascading into a parameter-binding error in the
+# execution phase.
+$analysisTemplateFile = Join-Path $botRoot 'core' 'prompts' '98-analyse-task.md'
+$executionTemplateFile = Join-Path $botRoot 'core' 'prompts' '99-autonomous-task.md'
+
+try {
+    $analysisPromptTemplate = Get-Content -Path $analysisTemplateFile -Raw -ErrorAction Stop
+} catch {
+    throw "Failed to load analysis prompt template '$analysisTemplateFile'. Ensure the file exists and is readable. $($_.Exception.Message)"
+}
+if ([string]::IsNullOrWhiteSpace($analysisPromptTemplate)) {
+    throw "Analysis prompt template '$analysisTemplateFile' is empty. A non-empty prompt template is required."
+}
+
+try {
+    $executionPromptTemplate = Get-Content -Path $executionTemplateFile -Raw -ErrorAction Stop
+} catch {
+    throw "Failed to load execution prompt template '$executionTemplateFile'. Ensure the file exists and is readable. $($_.Exception.Message)"
+}
+if ([string]::IsNullOrWhiteSpace($executionPromptTemplate)) {
+    throw "Execution prompt template '$executionTemplateFile' is empty. A non-empty prompt template is required."
+}
 
 $processData.workflow = "workflow (analyse + execute)"
 
@@ -733,6 +753,15 @@ try {
         }
 
         try {   # Per-task try/catch — catches failures in BOTH analysis and execution phases
+
+        # Defensive per-iteration init: the post-task hook flags are set on the
+        # success path further down (around the execution-phase init block).
+        # Set them here too so that any exception escaping before that block
+        # (e.g. a Build-TaskPrompt failure) cannot leave the elseif at the
+        # post-loop branch reading an unset variable under StrictMode.
+        $postScriptFailed = $false
+        $postScriptError = $null
+        $postScriptFailureSource = 'post_script'
 
         # --- Task type dispatch (script / mcp / task_gen bypass Claude entirely) ---
         $taskTypeVal = if ($task.type) { $task.type } else { 'prompt' }
@@ -1678,23 +1707,74 @@ Work on this task autonomously. When complete, ensure you call task_mark_done vi
         try { Remove-ProviderSession -SessionId $executionSessionId -ProjectRoot $projectRoot | Out-Null } catch { Write-BotLog -Level Debug -Message "Cleanup: failed to stop process" -Exception $_ }
 
         } catch {
-            # Execution phase setup/run failed — log and recover the task
-            Write-Diag "Execution EXCEPTION: $($_.Exception.Message)"
-            Write-Status "Execution failed: $($_.Exception.Message)" -Type Error
-            Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Execution failed for $($task.name): $($_.Exception.Message)"
+            # Execution phase setup/run failed — escalate to needs-input so the
+            # task picker stops re-selecting the same task and looping. The
+            # operator can inspect pending_question on the task record.
+            # Some exceptions surface with an empty .Message; fall back to the
+            # full error record so operators always see actionable context.
+            $execErrorMessage = $_.Exception.Message
+            if ([string]::IsNullOrWhiteSpace($execErrorMessage)) {
+                $execErrorMessage = $_.ToString()
+            }
+            if ([string]::IsNullOrWhiteSpace($execErrorMessage)) {
+                $execErrorMessage = '<no error details available>'
+            }
+            Write-Diag "Execution EXCEPTION: $execErrorMessage"
+            Write-Status "Execution failed: $execErrorMessage" -Type Error
+            Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Execution failed for $($task.name): $execErrorMessage"
             try {
                 $inProgressDir = Join-Path $tasksBaseDir "in-progress"
-                $todoDir = Join-Path $tasksBaseDir "todo"
+                $needsInputDir = Join-Path $tasksBaseDir "needs-input"
+                if (-not (Test-Path $needsInputDir)) {
+                    New-Item -ItemType Directory -Path $needsInputDir -Force | Out-Null
+                }
+                # Build a safe filename-prefix to find the task file:
+                # task IDs are not guaranteed to be 8+ chars (test fixtures
+                # use short IDs like 'notif001'), and may legitimately
+                # contain regex metacharacters. Substring(0,8) on a short
+                # ID throws and would crash the catch block itself,
+                # leaving the task stuck in in-progress and re-picked.
+                $taskIdPrefix = $null
+                if (-not [string]::IsNullOrEmpty($task.id)) {
+                    $prefixLength = [Math]::Min(8, $task.id.Length)
+                    $taskIdPrefix = [regex]::Escape($task.id.Substring(0, $prefixLength))
+                }
                 $taskFile = Get-ChildItem -Path $inProgressDir -Filter "*.json" -File -ErrorAction SilentlyContinue |
-                    Where-Object { $_.Name -match $task.id.Substring(0,8) } | Select-Object -First 1
+                    Where-Object { $taskIdPrefix -and $_.Name -match $taskIdPrefix } | Select-Object -First 1
                 if ($taskFile) {
                     $taskData = Get-Content $taskFile.FullName -Raw | ConvertFrom-Json
-                    $taskData.status = 'todo'
-                    $taskData | ConvertTo-Json -Depth 20 | Set-Content (Join-Path $todoDir $taskFile.Name) -Encoding UTF8
+                    $taskData.status = 'needs-input'
+                    $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                    # Match the canonical pending_question schema used by other
+                    # needs-input escalations (e.g. MergeConflictEscalation) so
+                    # NotificationPoller, task-answer-question, and the UI all
+                    # see a structured object instead of a bare string.
+                    $pendingQuestion = @{
+                        id             = "execution-failure-$($task.id)"
+                        question       = "Execution failed for task '$($task.name)'"
+                        context        = "Execution-phase exception: $execErrorMessage"
+                        options        = @(
+                            @{ key = "A"; label = "Investigate logs and retry"; rationale = "Inspect the worktree, fix the underlying issue, then move the task back to todo" }
+                            @{ key = "B"; label = "Skip this task"; rationale = "Mark the task skipped and continue with the rest of the workflow" }
+                        )
+                        recommendation = "A"
+                        asked_at       = $timestamp
+                    }
+                    if (-not ($taskData.PSObject.Properties.Name -contains 'pending_question')) {
+                        $taskData | Add-Member -NotePropertyName pending_question -NotePropertyValue $pendingQuestion -Force
+                    } else {
+                        $taskData.pending_question = $pendingQuestion
+                    }
+                    if (-not ($taskData.PSObject.Properties.Name -contains 'updated_at')) {
+                        $taskData | Add-Member -NotePropertyName updated_at -NotePropertyValue $timestamp -Force
+                    } else {
+                        $taskData.updated_at = $timestamp
+                    }
+                    $taskData | ConvertTo-Json -Depth 20 | Set-Content (Join-Path $needsInputDir $taskFile.Name) -Encoding UTF8
                     Remove-Item $taskFile.FullName -Force
-                    Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Recovered task $($task.name) back to todo"
+                    Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Escalated task $($task.name) to needs-input after execution failure"
                 }
-            } catch { Write-BotLog -Level Warn -Message "Failed to recover task" -Exception $_ }
+            } catch { Write-BotLog -Level Warn -Message "Failed to escalate task" -Exception $_ }
             $taskSuccess = $false
         }
 
@@ -1837,23 +1917,69 @@ Work on this task autonomously. When complete, ensure you call task_mark_done vi
             Write-Status "Task failed unexpectedly: $($_.Exception.Message)" -Type Error
             Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Task $($task.name) failed: $($_.Exception.Message)"
 
-            # Recover task: move from whatever state back to todo
+            # Recover task: escalate from whatever state to needs-input so the
+            # task picker stops re-selecting the same task and looping.
+            # Some exceptions surface with an empty .Message; fall back to the
+            # full error record so operators always see actionable context.
+            $perTaskErrorMessage = $_.Exception.Message
+            if ([string]::IsNullOrWhiteSpace($perTaskErrorMessage)) {
+                $perTaskErrorMessage = $_.ToString()
+            }
+            if ([string]::IsNullOrWhiteSpace($perTaskErrorMessage)) {
+                $perTaskErrorMessage = '<no error details available>'
+            }
             try {
+                $needsInputDir = Join-Path $tasksBaseDir "needs-input"
+                if (-not (Test-Path $needsInputDir)) {
+                    New-Item -ItemType Directory -Path $needsInputDir -Force | Out-Null
+                }
+                # Same safe filename-prefix as the execution-phase
+                # escalation above: short or regex-metachar task IDs
+                # would otherwise crash this catch and trap the task in
+                # analysing/ or in-progress/.
+                $taskIdPrefix = $null
+                if (-not [string]::IsNullOrEmpty($task.id)) {
+                    $prefixLength = [Math]::Min(8, $task.id.Length)
+                    $taskIdPrefix = [regex]::Escape($task.id.Substring(0, $prefixLength))
+                }
                 foreach ($searchDir in @('analysing', 'in-progress')) {
                     $dir = Join-Path $tasksBaseDir $searchDir
                     $found = Get-ChildItem -Path $dir -Filter "*.json" -File -ErrorAction SilentlyContinue |
-                        Where-Object { $_.Name -match $task.id.Substring(0,8) } | Select-Object -First 1
+                        Where-Object { $taskIdPrefix -and $_.Name -match $taskIdPrefix } | Select-Object -First 1
                     if ($found) {
                         $taskData = Get-Content $found.FullName -Raw | ConvertFrom-Json
-                        $taskData.status = 'todo'
-                        $todoDir = Join-Path $tasksBaseDir "todo"
-                        $taskData | ConvertTo-Json -Depth 20 | Set-Content (Join-Path $todoDir $found.Name) -Encoding UTF8
+                        $taskData.status = 'needs-input'
+                        $timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                        # Same canonical pending_question shape as the
+                        # execution-phase escalation above.
+                        $pendingQuestion = @{
+                            id             = "per-task-failure-$($task.id)"
+                            question       = "Per-task failure for '$($task.name)'"
+                            context        = "Per-task exception: $perTaskErrorMessage"
+                            options        = @(
+                                @{ key = "A"; label = "Investigate logs and retry"; rationale = "Inspect the failure context, fix the underlying issue, then move the task back to todo" }
+                                @{ key = "B"; label = "Skip this task"; rationale = "Mark the task skipped and continue with the rest of the workflow" }
+                            )
+                            recommendation = "A"
+                            asked_at       = $timestamp
+                        }
+                        if (-not ($taskData.PSObject.Properties.Name -contains 'pending_question')) {
+                            $taskData | Add-Member -NotePropertyName pending_question -NotePropertyValue $pendingQuestion -Force
+                        } else {
+                            $taskData.pending_question = $pendingQuestion
+                        }
+                        if (-not ($taskData.PSObject.Properties.Name -contains 'updated_at')) {
+                            $taskData | Add-Member -NotePropertyName updated_at -NotePropertyValue $timestamp -Force
+                        } else {
+                            $taskData.updated_at = $timestamp
+                        }
+                        $taskData | ConvertTo-Json -Depth 20 | Set-Content (Join-Path $needsInputDir $found.Name) -Encoding UTF8
                         Remove-Item $found.FullName -Force
-                        Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Recovered task $($task.name) back to todo"
+                        Write-ProcessActivity -Id $procId -ActivityType "text" -Message "Escalated task $($task.name) to needs-input after per-task failure"
                         break
                     }
                 }
-            } catch { Write-BotLog -Level Warn -Message "Failed to recover task" -Exception $_ }
+            } catch { Write-BotLog -Level Warn -Message "Failed to escalate task" -Exception $_ }
         }
 
         # Continue to next task?
