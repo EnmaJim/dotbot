@@ -70,12 +70,14 @@ if (-not (Test-Path (Join-Path $e2eDir "package.json"))) {
 
 $playwrightInstalled = Test-Path (Join-Path $e2eDir "node_modules/@playwright/test")
 if (-not $playwrightInstalled) {
-    Write-Host "  → Installing Playwright npm dependencies (one-time)..." -ForegroundColor Cyan
+    $packageLockPath = Join-Path $e2eDir "package-lock.json"
+    $npmCommand = if (Test-Path $packageLockPath) { "ci" } else { "install" }
+    Write-Host "  → Installing Playwright npm dependencies (one-time) using 'npm $npmCommand'..." -ForegroundColor Cyan
     Push-Location $e2eDir
     try {
-        & npm install --no-audit --no-fund --loglevel=error 2>&1 | Out-Host
+        & npm $npmCommand --no-audit --no-fund --loglevel=error 2>&1 | Out-Host
         if ($LASTEXITCODE -ne 0) {
-            throw "npm install failed (exit $LASTEXITCODE)"
+            throw "npm $npmCommand failed (exit $LASTEXITCODE)"
         }
     } finally {
         Pop-Location
