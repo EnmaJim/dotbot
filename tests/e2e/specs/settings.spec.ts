@@ -9,6 +9,7 @@ test.describe("Settings persistence via real /api/settings", () => {
   const settingsBackup: Record<string, string> = {};
   const settingsCandidates = [
     path.join(BOT_DIR, ".control", "settings.json"),
+    path.join(BOT_DIR, ".control", "ui-settings.json"),
     path.join(BOT_DIR, "settings", "settings.user.json"),
   ];
 
