@@ -872,6 +872,26 @@ if (Test-Path $serverFile) {
     Assert-True -Name "/api/workflows/installed does not emit synthetic 'default' row" `
         -Condition (-not ($serverContent -match 'is_default\s*=\s*\$true')) `
         -Message "Synthetic 'default' row should be gone after PR-5"
+
+    # Subfolders without workflow.yaml must be skipped, not indexed into.
+    $installedLoopMatch = [regex]::Match(
+        $serverContent,
+        'Get-CachedManifest\s+-Dir\s+\$wfDir[\s\S]{0,2000}?\$installedList\s*\+=',
+        'Singleline'
+    )
+    Assert-True -Name "/api/workflows/installed skips folders with no workflow.yaml" `
+        -Condition ($installedLoopMatch.Success -and $installedLoopMatch.Value -match 'if\s*\(\s*-not\s+\$manifest\s*\)') `
+        -Message "Enumeration loop must guard against `$null manifest before indexing properties"
+
+    # Empty/whitespace-only workflow.yaml must be treated the same as missing.
+    $cachedManifestMatch = [regex]::Match(
+        $serverContent,
+        'function\s+Get-CachedManifest\b[\s\S]{0,2000}?function\s+Get-CachedTaskWorkflow\b',
+        'Singleline'
+    )
+    Assert-True -Name "Get-CachedManifest skips empty/whitespace workflow.yaml" `
+        -Condition ($cachedManifestMatch.Success -and $cachedManifestMatch.Value -match '\[string\]::IsNullOrWhiteSpace') `
+        -Message "Get-CachedManifest must reject empty content (IsNullOrWhiteSpace) so the enumeration loop sees `$null"
 } else {
     Write-TestResult -Name "pending-tasks runner tests" -Status Skip -Message "Server file not found"
 }

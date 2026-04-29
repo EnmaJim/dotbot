@@ -41,6 +41,11 @@ $addonCount = 0
 if (Test-Path $workflowsDir) {
     $wfDirs = @(Get-ChildItem -Path $workflowsDir -Directory -ErrorAction SilentlyContinue)
     foreach ($d in $wfDirs) {
+        $wfYaml = Join-Path $d.FullName "workflow.yaml"
+        $rawYaml = Get-Content $wfYaml -Raw -ErrorAction SilentlyContinue
+        if ([string]::IsNullOrWhiteSpace($rawYaml)) {
+            continue
+        }
         $manifest = Read-WorkflowManifest -WorkflowDir $d.FullName
         $name = if ($manifest.name) { $manifest.name } else { $d.Name }
         $desc = if ($manifest.description) { $manifest.description } else { "" }

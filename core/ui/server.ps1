@@ -1846,6 +1846,11 @@ $docContext
                         if ($cached -and $cached.lastModified -eq $mtime) {
                             return $cached.manifest
                         }
+                        $raw = Get-Content $yamlPath -Raw -ErrorAction SilentlyContinue
+                        if ([string]::IsNullOrWhiteSpace($raw)) {
+                            $script:manifestCache[$Dir] = @{ manifest = $null; lastModified = $mtime }
+                            return $null
+                        }
                         $m = Read-WorkflowManifest -WorkflowDir $Dir
                         $script:manifestCache[$Dir] = @{ manifest = $m; lastModified = $mtime }
                         return $m
@@ -1900,6 +1905,9 @@ $docContext
                             $wfDir = $_.FullName
                             $wfName = $_.Name
                             $manifest = Get-CachedManifest -Dir $wfDir
+                            if (-not $manifest) {
+                                return
+                            }
 
                             # Task counts from pre-scanned bucket
                             $wfTasks = if ($tasksByWorkflow.ContainsKey($wfName)) { $tasksByWorkflow[$wfName] } else { @{ todo = 0; in_progress = 0; done = 0; total = 0 } }
