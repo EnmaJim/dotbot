@@ -3,15 +3,17 @@
 .SYNOPSIS
     Test runner for dotbot integration test suite.
 .DESCRIPTION
-    Orchestrates test layers 1-4. Use -Layer to select which layers to run.
+    Orchestrates test layers 1-5. Use -Layer to select which layers to run.
 .PARAMETER Layer
-    Which layer(s) to run: 1, 2, 3, 4, or 'all' (default: 'all' runs 1-3; use 4 explicitly)
+    Which layer(s) to run: 1, 2, 3, 4, 5, or 'all' (default: 'all' runs 1-3;
+    use 4 or 5 explicitly).
 .EXAMPLE
-    ./Run-Tests.ps1                # Runs layers 1-3
-    ./Run-Tests.ps1 -Layer 1       # Runs layer 1 only
-    ./Run-Tests.ps1 -Layer all     # Runs layers 1-3
-    ./Run-Tests.ps1 -Layer 4       # Runs layer 4 only (requires Claude credentials)
-    ./Run-Tests.ps1 -Layer 1,2,3,4 # Runs all layers including E2E
+    ./Run-Tests.ps1                  # Runs layers 1-3
+    ./Run-Tests.ps1 -Layer 1         # Runs layer 1 only
+    ./Run-Tests.ps1 -Layer all       # Runs layers 1-3
+    ./Run-Tests.ps1 -Layer 4         # Runs layer 4 only (requires Claude credentials)
+    ./Run-Tests.ps1 -Layer 5         # Runs layer 5 only (Playwright UI E2E)
+    ./Run-Tests.ps1 -Layer 1,2,3,4,5 # Runs every layer
 #>
 
 [CmdletBinding()]
@@ -38,9 +40,10 @@ foreach ($l in $Layer) {
         '2'    { $layersToRun += 2 }
         '3'    { $layersToRun += 3 }
         '4'    { $layersToRun += 4 }
+        '5'    { $layersToRun += 5 }
         default {
             Write-Host "  Unknown layer: $l" -ForegroundColor Red
-            Write-Host "  Valid values: 1, 2, 3, 4, all" -ForegroundColor Yellow
+            Write-Host "  Valid values: 1, 2, 3, 4, 5, all" -ForegroundColor Yellow
             exit 1
         }
     }
@@ -57,7 +60,7 @@ Write-Host ""
 # run against stale code and produce confusing failures.
 $devDir = Split-Path $PSScriptRoot -Parent  # repo root
 $installDir = Join-Path $HOME "dotbot"
-if ((Test-Path $installDir) -and (2 -in $layersToRun -or 3 -in $layersToRun -or 4 -in $layersToRun)) {
+if ((Test-Path $installDir) -and (2 -in $layersToRun -or 3 -in $layersToRun -or 4 -in $layersToRun -or 5 -in $layersToRun)) {
     # scripts/ is included so changes to init-project.ps1 / Platform-Functions.psm1
     # / etc. trigger an auto-reinstall (and downstream golden rebuild).
     $devNewest = (Get-ChildItem "$devDir/core","$devDir/workflows","$devDir/stacks","$devDir/scripts" -Recurse -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1).LastWriteTime
@@ -190,6 +193,13 @@ if (4 -in $layersToRun) {
 
     $layerResults["4"] = ($claudeExit -eq 0 -and $teamsExit -eq 0 -and $emailExit -eq 0 -and $jiraExit -eq 0)
     if ($claudeExit -ne 0 -or $teamsExit -ne 0 -or $emailExit -ne 0 -or $jiraExit -ne 0) { $overallFailed = $true }
+}
+
+# Layer 5: UI E2E (Playwright)
+if (5 -in $layersToRun) {
+    $exitCode = Invoke-TestFile -Layer '5' -FileName 'Test-UI-E2E.ps1'
+    $layerResults["5"] = ($exitCode -eq 0)
+    if ($exitCode -ne 0) { $overallFailed = $true }
 }
 
 # Overall summary
