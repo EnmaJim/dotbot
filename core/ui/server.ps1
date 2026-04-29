@@ -1999,7 +1999,7 @@ $docContext
                             # Installed workflows live at .bot/workflows/{name}/.
                             $wfDir = Join-Path $botRoot "workflows\$wfName"
 
-                            if (-not (Test-Path (Join-Path $wfDir "workflow.yaml"))) {
+                            if (-not (Test-ValidWorkflowDir -Dir $wfDir)) {
                                 $statusCode = 404
                                 $content = @{ success = $false; error = "Workflow not found: $wfName" } | ConvertTo-Json -Compress
                             } else {
@@ -2038,7 +2038,7 @@ $docContext
                             # Installed workflows live at .bot/workflows/{name}/.
                             $wfDir = Join-Path $botRoot "workflows\$wfName"
 
-                            if (-not (Test-Path (Join-Path $wfDir "workflow.yaml"))) {
+                            if (-not (Test-ValidWorkflowDir -Dir $wfDir)) {
                                 $statusCode = 404
                                 $content = @{ success = $false; error = "Workflow not found: $wfName" } | ConvertTo-Json -Compress
                             } else {

@@ -286,6 +286,60 @@ if (-not $hasYaml) {
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════════
+# TEST-VALIDWORKFLOWDIR
+# ═══════════════════════════════════════════════════════════════════
+
+Write-Host "  TEST-VALIDWORKFLOWDIR" -ForegroundColor Cyan
+Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+# Real workflow folder
+Assert-True -Name "Test-ValidWorkflowDir true for real workflow" `
+    -Condition (Test-ValidWorkflowDir -Dir (Join-Path $repoRoot "workflows\start-from-prompt")) `
+    -Message "Expected true for workflow with a populated workflow.yaml"
+
+# Non-existent directory
+Assert-True -Name "Test-ValidWorkflowDir false for non-existent dir" `
+    -Condition (-not (Test-ValidWorkflowDir -Dir (Join-Path $repoRoot "workflows\definitely-not-here"))) `
+    -Message "Expected false for non-existent directory"
+
+# Synthetic temp dirs for the missing/empty/whitespace cases
+$tempProbeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "dotbot-validdir-probe-$([System.Guid]::NewGuid().ToString().Substring(0,8))"
+try {
+    $noYaml = Join-Path $tempProbeRoot "no-yaml"
+    New-Item -ItemType Directory -Path $noYaml -Force | Out-Null
+    Assert-True -Name "Test-ValidWorkflowDir false when workflow.yaml missing" `
+        -Condition (-not (Test-ValidWorkflowDir -Dir $noYaml)) `
+        -Message "Expected false when workflow.yaml is absent"
+
+    $emptyYaml = Join-Path $tempProbeRoot "empty-yaml"
+    New-Item -ItemType Directory -Path $emptyYaml -Force | Out-Null
+    New-Item -ItemType File      -Path (Join-Path $emptyYaml "workflow.yaml") -Force | Out-Null
+    Assert-True -Name "Test-ValidWorkflowDir false when workflow.yaml empty" `
+        -Condition (-not (Test-ValidWorkflowDir -Dir $emptyYaml)) `
+        -Message "Expected false when workflow.yaml exists but is empty"
+
+    $wsYaml = Join-Path $tempProbeRoot "ws-yaml"
+    New-Item -ItemType Directory -Path $wsYaml -Force | Out-Null
+    "`r`n   `r`n`t" | Set-Content -Path (Join-Path $wsYaml "workflow.yaml")
+    Assert-True -Name "Test-ValidWorkflowDir false when workflow.yaml whitespace-only" `
+        -Condition (-not (Test-ValidWorkflowDir -Dir $wsYaml)) `
+        -Message "Expected false when workflow.yaml is whitespace-only"
+
+    $okYaml = Join-Path $tempProbeRoot "ok-yaml"
+    New-Item -ItemType Directory -Path $okYaml -Force | Out-Null
+    "name: probe`r`ndescription: ok" | Set-Content -Path (Join-Path $okYaml "workflow.yaml")
+    Assert-True -Name "Test-ValidWorkflowDir true when workflow.yaml has content" `
+        -Condition (Test-ValidWorkflowDir -Dir $okYaml) `
+        -Message "Expected true when workflow.yaml has any non-whitespace content"
+} finally {
+    if (Test-Path $tempProbeRoot) {
+        Remove-Item -Path $tempProbeRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Write-Host ""
+
+# ═══════════════════════════════════════════════════════════════════
 # CONVERT-MANIFESTREQUIRESTOPREFLIGHTCHECKS
 # ═══════════════════════════════════════════════════════════════════
 

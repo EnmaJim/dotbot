@@ -100,6 +100,11 @@ if (Test-Path $wfYamlSource) {
     if (Test-Path $manifestYaml) { Copy-Item $manifestYaml $wfYamlTarget -Force }
 }
 
+if (-not (Test-ValidWorkflowDir -Dir $wfTargetDir)) {
+    Write-DotbotError "Source at '$wfSourceDir' has no usable workflow.yaml. Not registering as an installed workflow."
+    exit 1
+}
+
 # Parse manifest
 $manifest = Read-WorkflowManifest -WorkflowDir $wfTargetDir
 

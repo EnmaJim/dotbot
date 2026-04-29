@@ -892,9 +892,70 @@ if (Test-Path $serverFile) {
     Assert-True -Name "Get-CachedManifest skips empty/whitespace workflow.yaml" `
         -Condition ($cachedManifestMatch.Success -and $cachedManifestMatch.Value -match '\[string\]::IsNullOrWhiteSpace') `
         -Message "Get-CachedManifest must reject empty content (IsNullOrWhiteSpace) so the enumeration loop sees `$null"
+
+    # /api/workflows/{name}/form and /run must reject empty/missing workflow.yaml,
+    # not just absent files. Both should call Test-ValidWorkflowDir.
+    $formRouteMatch = [regex]::Match(
+        $serverContent,
+        '"\/api\/workflows\/\*\/form"[\s\S]{0,2500}?Read-WorkflowManifest',
+        'Singleline'
+    )
+    Assert-True -Name "/api/workflows/{name}/form gates on Test-ValidWorkflowDir" `
+        -Condition ($formRouteMatch.Success -and $formRouteMatch.Value -match 'Test-ValidWorkflowDir') `
+        -Message "/form route must validate yaml content, not just file presence"
+
+    $runRouteMatch = [regex]::Match(
+        $serverContent,
+        '"\/api\/workflows\/\*\/run"[\s\S]{0,6000}?Read-WorkflowManifest',
+        'Singleline'
+    )
+    Assert-True -Name "/api/workflows/{name}/run gates on Test-ValidWorkflowDir" `
+        -Condition ($runRouteMatch.Success -and $runRouteMatch.Value -match 'Test-ValidWorkflowDir') `
+        -Message "/run route must validate yaml content, not just file presence"
 } else {
     Write-TestResult -Name "pending-tasks runner tests" -Status Skip -Message "Server file not found"
 }
+
+# ═══════════════════════════════════════════════════════════════════
+# WORKFLOW-MANIFEST.PS1 (active manifest fallback)
+# ═══════════════════════════════════════════════════════════════════
+
+Write-Host ""
+Write-Host "  ACTIVE WORKFLOW MANIFEST FALLBACK" -ForegroundColor Cyan
+Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+$wfManifestSrc = Get-Content (Join-Path $dotbotDir "core/runtime/modules/workflow-manifest.ps1") -Raw
+
+Assert-True -Name "Test-ValidWorkflowDir defined" `
+    -Condition ($wfManifestSrc -match 'function\s+Test-ValidWorkflowDir\b') `
+    -Message "Test-ValidWorkflowDir must exist as the single source of truth for valid workflow folders"
+
+$activeFnMatch = [regex]::Match(
+    $wfManifestSrc,
+    'function\s+Get-ActiveWorkflowManifest\b[\s\S]{0,3000}?\nfunction\s+',
+    'Singleline'
+)
+Assert-True -Name "Get-ActiveWorkflowManifest fallback uses Test-ValidWorkflowDir" `
+    -Condition ($activeFnMatch.Success -and ($activeFnMatch.Value -split 'Test-ValidWorkflowDir').Length -ge 3) `
+    -Message "Get-ActiveWorkflowManifest must apply Test-ValidWorkflowDir on both the named-workflow path and the alphabetic-first scan"
+
+# ═══════════════════════════════════════════════════════════════════
+# INSTALL SCRIPTS (workflow-add, init-project)
+# ═══════════════════════════════════════════════════════════════════
+
+Write-Host ""
+Write-Host "  INSTALL SCRIPT SOURCE-YAML VALIDATION" -ForegroundColor Cyan
+Write-Host "  ────────────────────────────────────────────" -ForegroundColor DarkGray
+
+$workflowAddSrc = Get-Content (Join-Path $dotbotDir "scripts/workflow-add.ps1") -Raw
+Assert-True -Name "workflow-add.ps1 aborts when source has no usable workflow.yaml" `
+    -Condition ($workflowAddSrc -match 'Test-ValidWorkflowDir[\s\S]{0,300}?exit\s+1') `
+    -Message "workflow-add.ps1 must call Test-ValidWorkflowDir and exit 1 before registering the workflow"
+
+$initSrc = Get-Content (Join-Path $dotbotDir "scripts/init-project.ps1") -Raw
+Assert-True -Name "init-project.ps1 skips workflows with no usable workflow.yaml" `
+    -Condition ($initSrc -match 'Test-ValidWorkflowDir[\s\S]{0,300}?continue') `
+    -Message "init-project.ps1 must call Test-ValidWorkflowDir and continue (skip) before registering the workflow"
 
 # ═══════════════════════════════════════════════════════════════════
 # GLOBAL USER SETTINGS (runtime resolution)
