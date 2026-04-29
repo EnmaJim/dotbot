@@ -189,3 +189,7 @@ if (-not (Get-Module SettingsLoader)) {
 ### Tests
 
 Unit tests live in `tests/Test-Components.ps1` under `--- SettingsLoader Module ---`. Integration coverage (including no-leak regression) lives in `tests/Test-WorkflowIntegration.ps1` under `GLOBAL USER SETTINGS (runtime)`. Extend those sections when adding merge behavior.
+
+## Workflow Manifest Validation Rules
+
+Canonical helper: `Test-ValidWorkflowDir -Dir <path>` in `core/runtime/modules/workflow-manifest.ps1`. Returns `$true` when `<path>/workflow.yaml` exists AND is not whitespace-only.
