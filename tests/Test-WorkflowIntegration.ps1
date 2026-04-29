@@ -889,9 +889,9 @@ if (Test-Path $serverFile) {
         'function\s+Get-CachedManifest\b[\s\S]{0,2000}?function\s+Get-CachedTaskWorkflow\b',
         'Singleline'
     )
-    Assert-True -Name "Get-CachedManifest skips empty/whitespace workflow.yaml" `
-        -Condition ($cachedManifestMatch.Success -and $cachedManifestMatch.Value -match '\[string\]::IsNullOrWhiteSpace') `
-        -Message "Get-CachedManifest must reject empty content (IsNullOrWhiteSpace) so the enumeration loop sees `$null"
+    Assert-True -Name "Get-CachedManifest gates on Test-ValidWorkflowDir" `
+        -Condition ($cachedManifestMatch.Success -and $cachedManifestMatch.Value -match 'Test-ValidWorkflowDir') `
+        -Message "Get-CachedManifest must delegate to Test-ValidWorkflowDir so missing/empty yaml is treated as `$null"
 
     # /api/workflows/{name}/form and /run must reject empty/missing workflow.yaml,
     # not just absent files. Both should call Test-ValidWorkflowDir.
@@ -956,6 +956,11 @@ $initSrc = Get-Content (Join-Path $dotbotDir "scripts/init-project.ps1") -Raw
 Assert-True -Name "init-project.ps1 skips workflows with no usable workflow.yaml" `
     -Condition ($initSrc -match 'Test-ValidWorkflowDir[\s\S]{0,300}?continue') `
     -Message "init-project.ps1 must call Test-ValidWorkflowDir and continue (skip) before registering the workflow"
+
+$wfListSrc = Get-Content (Join-Path $dotbotDir "scripts/workflow-list.ps1") -Raw
+Assert-True -Name "workflow-list.ps1 skips folders without a usable workflow.yaml" `
+    -Condition ($wfListSrc -match 'Test-ValidWorkflowDir[\s\S]{0,200}?continue') `
+    -Message "workflow-list.ps1 must call Test-ValidWorkflowDir and continue past invalid subfolders"
 
 # ═══════════════════════════════════════════════════════════════════
 # GLOBAL USER SETTINGS (runtime resolution)
