@@ -949,18 +949,39 @@ Write-Host "  ──────────────────────
 
 $workflowAddSrc = Get-Content (Join-Path $dotbotDir "scripts/workflow-add.ps1") -Raw
 Assert-True -Name "workflow-add.ps1 aborts when source has no usable workflow.yaml" `
-    -Condition ($workflowAddSrc -match 'Test-ValidWorkflowDir[\s\S]{0,300}?exit\s+1') `
+    -Condition ($workflowAddSrc -match 'Test-ValidWorkflowDir[\s\S]{0,800}?exit\s+1') `
     -Message "workflow-add.ps1 must call Test-ValidWorkflowDir and exit 1 before registering the workflow"
 
 $initSrc = Get-Content (Join-Path $dotbotDir "scripts/init-project.ps1") -Raw
 Assert-True -Name "init-project.ps1 skips workflows with no usable workflow.yaml" `
-    -Condition ($initSrc -match 'Test-ValidWorkflowDir[\s\S]{0,300}?continue') `
+    -Condition ($initSrc -match 'Test-ValidWorkflowDir[\s\S]{0,800}?continue') `
     -Message "init-project.ps1 must call Test-ValidWorkflowDir and continue (skip) before registering the workflow"
 
 $wfListSrc = Get-Content (Join-Path $dotbotDir "scripts/workflow-list.ps1") -Raw
 Assert-True -Name "workflow-list.ps1 skips folders without a usable workflow.yaml" `
     -Condition ($wfListSrc -match 'Test-ValidWorkflowDir[\s\S]{0,200}?continue') `
     -Message "workflow-list.ps1 must call Test-ValidWorkflowDir and continue past invalid subfolders"
+
+$wfRunSrc = Get-Content (Join-Path $dotbotDir "scripts/workflow-run.ps1") -Raw
+Assert-True -Name "workflow-run.ps1 rejects workflows without a usable workflow.yaml" `
+    -Condition ($wfRunSrc -match 'Test-ValidWorkflowDir[\s\S]{0,400}?exit\s+1') `
+    -Message "workflow-run.ps1 must call Test-ValidWorkflowDir before treating the workflow as installed"
+Assert-True -Name "workflow-run.ps1 has no bare Test-Path on workflow.yaml" `
+    -Condition (-not ($wfRunSrc -match 'Test-Path[^\)\r\n]*workflow\.yaml')) `
+    -Message "workflow-run.ps1 must not gate on Test-Path workflow.yaml; use Test-ValidWorkflowDir instead"
+
+$registryListSrc = Get-Content (Join-Path $dotbotDir "scripts/registry-list.ps1") -Raw
+Assert-True -Name "registry-list.ps1 gates workflow description on Test-ValidWorkflowDir" `
+    -Condition ($registryListSrc -match 'Test-ValidWorkflowDir') `
+    -Message "registry-list.ps1 must apply the missing/empty/whitespace rule when previewing registry workflows"
+Assert-True -Name "registry-list.ps1 has no bare Test-Path on workflow.yaml" `
+    -Condition (-not ($registryListSrc -match 'Test-Path[^\)\r\n]*workflow\.yaml')) `
+    -Message "registry-list.ps1 must not gate on Test-Path workflow.yaml; use Test-ValidWorkflowDir instead"
+
+$mcpSrc = Get-Content (Join-Path $dotbotDir "core/mcp/dotbot-mcp.ps1") -Raw
+Assert-True -Name "dotbot-mcp.ps1 gates workflow tool discovery on Test-ValidWorkflowDir" `
+    -Condition ($mcpSrc -match 'Test-ValidWorkflowDir') `
+    -Message "dotbot-mcp.ps1 must skip workflow subfolders that fail Test-ValidWorkflowDir when registering tools"
 
 # ═══════════════════════════════════════════════════════════════════
 # GLOBAL USER SETTINGS (runtime resolution)

@@ -789,16 +789,16 @@ try {
         # normal analysis+execution path instead of being dispatched (and skipped).
         if ($taskTypeVal -eq 'task_gen' -and -not $task.script_path -and $task.workflow) {
             try {
-                $wfManifestPath = Join-Path $botRoot "workflows\$($task.workflow)\workflow.yaml"
-                if (Test-Path $wfManifestPath) {
-                    if (-not (Get-Command Read-WorkflowManifest -ErrorAction SilentlyContinue)) {
-                        . (Join-Path $botRoot "core/runtime/modules/workflow-manifest.ps1")
-                    }
-                    $wfManifest = Read-WorkflowManifest -WorkflowDir (Join-Path $botRoot "workflows\$($task.workflow)")
+                if (-not (Get-Command Read-WorkflowManifest -ErrorAction SilentlyContinue)) {
+                    . (Join-Path $botRoot "core/runtime/modules/workflow-manifest.ps1")
+                }
+                $wfTaskDir = Join-Path $botRoot "workflows\$($task.workflow)"
+                if (Test-ValidWorkflowDir -Dir $wfTaskDir) {
+                    $wfManifest = Read-WorkflowManifest -WorkflowDir $wfTaskDir
                     $matchingPhase = $wfManifest.tasks | Where-Object { $_['name'] -eq $task.name } | Select-Object -First 1
                     if ($matchingPhase -and $matchingPhase['workflow']) {
                         $recoveredPromptPath = "recipes/prompts/$($matchingPhase['workflow'])"
-                        $tplPath = Join-Path (Join-Path $botRoot "workflows\$($task.workflow)") $recoveredPromptPath
+                        $tplPath = Join-Path $wfTaskDir $recoveredPromptPath
                         if (-not (Test-Path $tplPath)) { $tplPath = Join-Path $botRoot $recoveredPromptPath }
                         if (Test-Path $tplPath) {
                             Write-Status "Recovering task_gen '$($task.name)' as prompt_template: $recoveredPromptPath" -Type Info

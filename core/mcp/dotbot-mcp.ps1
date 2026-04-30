@@ -60,6 +60,7 @@ if (Test-Path $tasksCheck) {
 
 # Load helpers
 . "$PSScriptRoot\dotbot-mcp-helpers.ps1"
+. "$PSScriptRoot\..\runtime\modules\workflow-manifest.ps1"
 
 # Import PowerShell YAML module for proper YAML parsing
 try {
@@ -105,7 +106,9 @@ foreach ($toolDirItem in $toolDirs) {
 # Discover workflow tools: .bot/workflows/*/tools/
 $workflowsDir = Join-Path (Split-Path $PSScriptRoot -Parent) "..\workflows"
 if (Test-Path $workflowsDir) {
-    Get-ChildItem -Path $workflowsDir -Directory | ForEach-Object {
+    Get-ChildItem -Path $workflowsDir -Directory | Where-Object {
+        Test-ValidWorkflowDir -Dir $_.FullName
+    } | ForEach-Object {
         $wfName = $_.Name
         $wfToolsDir = Join-Path $_.FullName "tools"
         if (Test-Path $wfToolsDir) {
