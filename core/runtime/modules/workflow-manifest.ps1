@@ -95,11 +95,47 @@ function Test-ValidWorkflowDir {
     )
 
     $yamlPath = Join-Path $Dir "workflow.yaml"
-    if (-not (Test-Path $yamlPath)) {
+    if (-not (Test-Path -LiteralPath $yamlPath -PathType Leaf)) {
         return $false
     }
-    $raw = Get-Content $yamlPath -Raw -ErrorAction SilentlyContinue
-    return -not [string]::IsNullOrWhiteSpace($raw)
+
+    try {
+        $item = Get-Item -LiteralPath $yamlPath -ErrorAction Stop
+    } catch {
+        return $false
+    }
+    if ($item.Length -eq 0) {
+        return $false
+    }
+
+    $stream = $null
+    $reader = $null
+    try {
+        $stream = [System.IO.File]::Open(
+            $yamlPath,
+            [System.IO.FileMode]::Open,
+            [System.IO.FileAccess]::Read,
+            [System.IO.FileShare]::ReadWrite)
+        $reader = [System.IO.StreamReader]::new($stream)
+        while ($true) {
+            $codepoint = $reader.Read()
+            if ($codepoint -lt 0) {
+                return $false
+            }
+            if (-not [char]::IsWhiteSpace([char]$codepoint)) {
+                return $true
+            }
+        }
+    } catch {
+        return $false
+    } finally {
+        if ($reader) {
+            $reader.Dispose()
+        }
+        if ($stream) {
+            $stream.Dispose()
+        }
+    }
 }
 
 function Get-ActiveWorkflowManifest {

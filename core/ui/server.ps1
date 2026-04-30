@@ -1839,14 +1839,18 @@ $docContext
                     # --- Helper: cached manifest read (mtime-based) ---
                     function Get-CachedManifest {
                         param([string]$Dir)
-                        if (-not (Test-ValidWorkflowDir -Dir $Dir)) {
+                        $yamlPath = Join-Path $Dir "workflow.yaml"
+                        if (-not (Test-Path -LiteralPath $yamlPath -PathType Leaf)) {
                             return $null
                         }
-                        $yamlPath = Join-Path $Dir "workflow.yaml"
-                        $mtime = (Get-Item $yamlPath).LastWriteTimeUtc
+                        $mtime = (Get-Item -LiteralPath $yamlPath).LastWriteTimeUtc
                         $cached = $script:manifestCache[$Dir]
                         if ($cached -and $cached.lastModified -eq $mtime) {
                             return $cached.manifest
+                        }
+                        if (-not (Test-ValidWorkflowDir -Dir $Dir)) {
+                            $script:manifestCache[$Dir] = @{ manifest = $null; lastModified = $mtime }
+                            return $null
                         }
                         $m = Read-WorkflowManifest -WorkflowDir $Dir
                         $script:manifestCache[$Dir] = @{ manifest = $m; lastModified = $mtime }
