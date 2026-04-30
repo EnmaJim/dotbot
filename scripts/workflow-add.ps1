@@ -102,6 +102,13 @@ if (Test-Path $wfYamlSource) {
 
 if (-not (Test-ValidWorkflowDir -Dir $wfTargetDir)) {
     Write-DotbotError "Source at '$wfSourceDir' has no usable workflow.yaml. Not registering as an installed workflow."
+    if (Test-Path $wfTargetDir) {
+        try {
+            Remove-Item -Path $wfTargetDir -Recurse -Force
+        } catch {
+            Write-DotbotError "Failed to clean up partially installed workflow directory '$wfTargetDir': $($_.Exception.Message)"
+        }
+    }
     exit 1
 }
 
