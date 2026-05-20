@@ -72,6 +72,27 @@ if ($blobEndpoint) {
     }
 }
 
+# --- pick auth flags ---------------------------------------------------------
+# When the connection string targets Azurite, Azure CLI 2.85+ mis-signs requests
+# for the full DefaultEndpointsProtocol=...;AccountName=...;AccountKey=...;BlobEndpoint=...;
+# form and returns "AuthorizationFailure" (surfaced as the misleading
+# "request may be blocked by network rules" message). The short
+# "UseDevelopmentStorage=true" form uses Azure CLI's built-in Azurite preset
+# which signs correctly. Substitute it transparently when we detect Azurite.
+#
+# Detection uses the well-known Azurite account key (a public constant baked
+# into Azurite's source). Real Azure storage accounts generate random 512-bit
+# keys at creation time, so this value never appears outside the emulator.
+$AzuriteWellKnownKey = 'Eby8vdM02xNOcqFlqUwJPLlmEu9Fyuwz2LNgaXcHMRvXv3lGbPjhImDs4Wqg6zY/JxGgZANyEDOmXpKXHVRjkw=='
+
+if ($connectionString -like "*$AzuriteWellKnownKey*" -or $connectionString -match '^\s*UseDevelopmentStorage\s*=\s*true\s*;?\s*$') {
+    $effectiveConnectionString = 'UseDevelopmentStorage=true'
+    $authMode = 'key'
+} else {
+    $effectiveConnectionString = $connectionString
+    $authMode = $null
+}
+
 # --- create containers --------------------------------------------------------
 $containers = @('answers', 'conversation-references')
 
@@ -79,10 +100,15 @@ foreach ($name in $containers) {
     Write-Host "Ensuring container '$name' ... " -NoNewline -ForegroundColor Gray
     # Note: omitting --fail-on-exist makes the command idempotent.
     # Passing it (even with no value) flips it on and would error when the container exists.
-    $result = az storage container create `
-        --name $name `
-        --connection-string $connectionString `
-        --output json 2>&1
+    $azArgs = @(
+        'storage', 'container', 'create',
+        '--name', $name,
+        '--connection-string', $effectiveConnectionString,
+        '--output', 'json'
+    )
+    if ($authMode) { $azArgs += @('--auth-mode', $authMode) }
+
+    $result = az @azArgs 2>&1
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "FAIL" -ForegroundColor Red
