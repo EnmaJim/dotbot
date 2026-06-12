@@ -363,7 +363,7 @@ try {
         $sentinelFound = $false
         while ((Get-Date) -lt $sentinelDeadline) {
             if (Test-Path -LiteralPath $sentinelPath) { $sentinelFound = $true; break }
-            if ($slowStreamJob.State -ne 'Running') { break }
+            if ($slowStreamJob.State -in @('Completed', 'Failed', 'Stopped')) { break }
             Start-Sleep -Milliseconds 100
         }
 
