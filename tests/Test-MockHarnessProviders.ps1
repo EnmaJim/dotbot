@@ -353,16 +353,34 @@ try {
             }
         } -ArgumentList $harnessModule, $themeModule, $tempCwd
 
-        $deadline = (Get-Date).AddSeconds(2)
-        $foundWhileRunning = $false
-        while ((Get-Date) -lt $deadline) {
-            if ((Test-Path -LiteralPath $activityLog) -and
-                ((Get-Content -LiteralPath $activityLog -Raw) -match "DOTBOT_ANTIGRAVITY_STREAM_FIRST")) {
-                $foundWhileRunning = ($slowStreamJob.State -eq 'Running')
-                break
-            }
-            if ($slowStreamJob.State -ne 'Running') { break }
+        # Wait for the mock's sentinel file rather than the activity log.
+        # The sentinel is written by mock-antigravity.ps1 immediately after its
+        # first stdout/stderr flush, before the 8-second sleep, so its presence
+        # proves the mock is still alive without depending on harness parse
+        # latency — which varies enough on macOS to cause false failures (#474).
+        $sentinelPath = Join-Path $mockLogDir "mock-antigravity-stream-started.sentinel"
+        $sentinelDeadline = (Get-Date).AddSeconds(10)
+        $sentinelFound = $false
+        while ((Get-Date) -lt $sentinelDeadline) {
+            if (Test-Path -LiteralPath $sentinelPath) { $sentinelFound = $true; break }
+            if ($slowStreamJob.State -in @('Completed', 'Failed', 'Stopped')) { break }
             Start-Sleep -Milliseconds 100
+        }
+
+        # Once sentinel exists the mock is guaranteed still sleeping (8 s total).
+        # Now wait for the harness to flush the first line to the activity log.
+        $foundWhileRunning = $false
+        if ($sentinelFound -and $slowStreamJob.State -eq 'Running') {
+            $actDeadline = (Get-Date).AddSeconds(6)
+            while ((Get-Date) -lt $actDeadline) {
+                if ((Test-Path -LiteralPath $activityLog) -and
+                    ((Get-Content -LiteralPath $activityLog -Raw) -match "DOTBOT_ANTIGRAVITY_STREAM_FIRST")) {
+                    $foundWhileRunning = ($slowStreamJob.State -eq 'Running')
+                    break
+                }
+                if ($slowStreamJob.State -in @('Completed', 'Failed', 'Stopped')) { break }
+                Start-Sleep -Milliseconds 100
+            }
         }
 
         Assert-True -Name "Antigravity logs stream output before process exit" `

@@ -21,7 +21,12 @@ if ($env:DOTBOT_MOCK_ANTIGRAVITY_MODE -eq "slow-stream") {
     [Console]::Out.Flush()
     [Console]::Error.WriteLine("DOTBOT_ANTIGRAVITY_STREAM_STDERR")
     [Console]::Error.Flush()
-    Start-Sleep -Seconds 3
+    # Sentinel written AFTER both streams are flushed so the test can wait on
+    # a file the mock controls directly — no harness parse latency involved.
+    # The test reads this sentinel to confirm the mock is still alive before
+    # asserting the activity log was written mid-execution (#474).
+    Set-Content -Path (Join-Path $logDir "mock-antigravity-stream-started.sentinel") -Value "1" -Encoding UTF8
+    Start-Sleep -Seconds 8
     Write-Output "DOTBOT_ANTIGRAVITY_STREAM_DONE"
     exit 0
 }
