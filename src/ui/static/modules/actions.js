@@ -303,7 +303,7 @@ function renderQuestionItem(item) {
 
     if (questionType === 'approval') {
         return `
-        <div class="action-item" data-task-id="${escapeHtml(item.task_id)}" data-type="question" data-question-type="approval">
+        <div class="action-item" data-task-id="${escapeAttr(item.task_id)}" data-type="question" data-question-type="approval">
             <div class="action-item-header">
                 <span class="action-item-type question">Approval</span>
                 <span class="action-item-task">${escapeHtml(item.task_name)}</span>
@@ -347,8 +347,8 @@ function renderQuestionItem(item) {
                 <div class="answer-options" data-multi-select="${isMultiSelect}">
                     ${options.map(opt => `
                         <div class="answer-option"
-                             data-key="${escapeHtml(opt.key)}"
-                             data-label="${escapeHtml(opt.label)}">
+                             data-key="${escapeAttr(opt.key)}"
+                             data-label="${escapeAttr(opt.label)}">
                             <span class="answer-key">${escapeHtml(opt.key)}</span>
                             <div class="answer-content">
                                 <div class="answer-label">${escapeHtml(opt.label)}</div>
@@ -365,7 +365,7 @@ function renderQuestionItem(item) {
 
                 <div class="answer-attachments-section">
                     <div class="answer-attachments-label">Attach files (optional)</div>
-                    <div class="answer-dropzone" data-task-id="${escapeHtml(item.task_id)}">
+                    <div class="answer-dropzone" data-task-id="${escapeAttr(item.task_id)}">
                         <div class="dropzone-content">
                             <div class="dropzone-icon">&#9671;</div>
                             <div class="dropzone-text">Drop files here or click to browse</div>
@@ -511,7 +511,7 @@ function renderSplitItem(item) {
     const subTasks = proposal.sub_tasks || [];
 
     return `
-        <div class="action-item" data-task-id="${escapeHtml(item.task_id)}" data-type="split">
+        <div class="action-item" data-task-id="${escapeAttr(item.task_id)}" data-type="split">
             <div class="action-item-header">
                 <span class="action-item-type split">Split Proposal</span>
                 <span class="action-item-task">${escapeHtml(item.task_name)}</span>
@@ -549,7 +549,7 @@ function renderWorkflowLaunchQuestionsItem(item) {
     const roundLabel = round > 1 ? ` (Round ${round})` : '';
 
     return `
-        <div class="action-item" data-process-id="${escapeHtml(item.process_id)}" data-type="workflow-launch-questions">
+        <div class="action-item" data-process-id="${escapeAttr(item.process_id)}" data-type="workflow-launch-questions">
             <div class="action-item-header">
                 <span class="action-item-type workflow-launch">Project Interview${escapeHtml(roundLabel)}</span>
                 <span class="action-item-task">${escapeHtml(item.description || 'Project Setup')}</span>
@@ -557,15 +557,15 @@ function renderWorkflowLaunchQuestionsItem(item) {
             <div class="action-item-body">
                 ${questions.map((q, idx) => `
                     ${idx > 0 ? '<div class="question-divider"></div>' : ''}
-                    <div class="workflow-launch-question" data-question-id="${escapeHtml(q.id)}">
+                    <div class="workflow-launch-question" data-question-id="${escapeAttr(q.id)}">
                         <div class="action-question-text"><span class="question-number">Q${idx + 1}.</span> ${escapeHtml(q.question)}</div>
                         ${q.context ? `<div class="action-question-context">${escapeHtml(q.context)}</div>` : ''}
                         <div class="answer-options" data-multi-select="false">
                             ${(q.options || []).map(opt => `
                                 <div class="answer-option"
-                                     data-key="${escapeHtml(opt.key)}"
-                                     data-label="${escapeHtml(opt.label)}"
-                                     data-question-key="${escapeHtml(q.id)}">
+                                     data-key="${escapeAttr(opt.key)}"
+                                     data-label="${escapeAttr(opt.label)}"
+                                     data-question-key="${escapeAttr(q.id)}">
                                     <span class="answer-key">${escapeHtml(opt.key)}</span>
                                     <div class="answer-content">
                                         <div class="answer-label">${escapeHtml(opt.label)}</div>
@@ -577,9 +577,9 @@ function renderWorkflowLaunchQuestionsItem(item) {
                         <div class="workflow-launch-question-freetext">
                             <textarea class="workflow-launch-freetext-input" placeholder="Or type a custom answer..."></textarea>
                         </div>
-                        <div class="answer-attachments-section" data-process-id="${escapeHtml(item.process_id)}" data-question-id="${escapeHtml(q.id)}">
+                        <div class="answer-attachments-section" data-process-id="${escapeAttr(item.process_id)}" data-question-id="${escapeAttr(q.id)}">
                             <div class="answer-attachments-label">Attach files (optional)</div>
-                            <div class="answer-dropzone" data-process-id="${escapeHtml(item.process_id)}" data-question-id="${escapeHtml(q.id)}">
+                            <div class="answer-dropzone" data-process-id="${escapeAttr(item.process_id)}" data-question-id="${escapeAttr(q.id)}">
                                 <div class="dropzone-content">
                                     <div class="dropzone-icon">&#9671;</div>
                                     <div class="dropzone-text">Drop files here or click to browse</div>
@@ -998,7 +998,7 @@ function updateAnswerFileList(taskId, section) {
             <span class="answer-file-icon">&#9671;</span>
             <span class="answer-file-name">${escapeHtml(file.name)}</span>
             <span class="answer-file-size">${sizeStr}</span>
-            <button class="answer-file-remove" data-idx="${idx}" data-task-id="${escapeHtml(taskId)}" title="Remove">&times;</button>
+            <button class="answer-file-remove" data-idx="${idx}" data-task-id="${escapeAttr(taskId)}" title="Remove">&times;</button>
         </div>`;
     }).join('');
     container.querySelectorAll('.answer-file-remove').forEach(btn => {
@@ -1047,7 +1047,7 @@ function updateWorkflowLaunchFileList(key, section) {
             <span class="answer-file-icon">&#9671;</span>
             <span class="answer-file-name">${escapeHtml(file.name)}</span>
             <span class="answer-file-size">${sizeStr}</span>
-            <button class="answer-file-remove" data-idx="${idx}" data-key="${escapeHtml(key)}" title="Remove">&times;</button>
+            <button class="answer-file-remove" data-idx="${idx}" data-key="${escapeAttr(key)}" title="Remove">&times;</button>
         </div>`;
     }).join('');
     container.querySelectorAll('.answer-file-remove').forEach(btn => {
@@ -1359,7 +1359,7 @@ function renderReviewItem(item) {
     const feedback = Array.isArray(item.feedback) ? item.feedback : [];
     const shortSha = item.pending_commit ? String(item.pending_commit).slice(0, 7) : null;
     return `
-        <div class="action-item" data-task-id="${escapeHtml(item.task_id)}" data-type="review">
+        <div class="action-item" data-task-id="${escapeAttr(item.task_id)}" data-type="review">
             <div class="action-item-header">
                 <span class="action-item-type review">Review Required</span>
                 <span class="action-item-task">${escapeHtml(item.task_name)}</span>
