@@ -79,7 +79,7 @@ function updateTaskCounts(tasks) {
     // Overview stats
     setElementText('todo-count', tasks.todo);
     setElementText('progress-count', tasks.in_progress);
-    setElementText('done-count', (tasks.done || 0) + (tasks.skipped || 0));
+    setElementText('done-count', getCompletedTaskCount(tasks));
     setElementText('analysing-count', tasks.analysing || 0);
     setElementText('needs-input-count', tasks.needs_input || 0);
     setElementText('analysed-count', tasks.analysed || 0);
@@ -88,7 +88,7 @@ function updateTaskCounts(tasks) {
     setElementText('pipeline-todo-count', tasks.todo);
     setElementText('pipeline-working-count', (tasks.analysing || 0) + (tasks.in_progress || 0));
     setElementText('pipeline-needs-input-count', tasks.needs_input || 0);
-    setElementText('pipeline-done-count', (tasks.done || 0) + (tasks.skipped || 0));
+    setElementText('pipeline-done-count', getCompletedTaskCount(tasks));
     // Legacy pipeline counts (kept for backward compat)
     setElementText('pipeline-analysing-count', tasks.analysing || 0);
     setElementText('pipeline-analysed-count', tasks.analysed || 0);
