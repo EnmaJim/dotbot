@@ -470,7 +470,7 @@ function updatePipelineColumn(containerId, tasks, type) {
     const limit = pipelineDisplayLimits[containerId] || 10;
     const visibleTasks = taskList.slice(0, limit);
 
-    container.innerHTML = visibleTasks.map(task => {
+    const taskMarkup = visibleTasks.map(task => {
         const priorityClass = task.priority == 1 ? 'priority-high' :
                               task.priority == 2 ? 'priority-med' : '';
         const ignoreState = task.ignore_state || {};
@@ -519,6 +519,28 @@ function updatePipelineColumn(containerId, tasks, type) {
             </div>
         `;
     }).join('');
+
+    // Reveal-more affordance. The column caps rendering at `limit` and relies on
+    // the scroll handler to load more, but a column that doesn't overflow never
+    // fires a scroll event — leaving the remaining tasks hidden while the count
+    // claims otherwise (#454). A visible button guarantees every task is reachable
+    // regardless of whether the column scrolls.
+    const remaining = taskList.length - visibleTasks.length;
+    const loadMoreMarkup = remaining > 0
+        ? `<button type="button" class="pipeline-load-more">Show ${remaining} more</button>`
+        : '';
+
+    container.innerHTML = taskMarkup + loadMoreMarkup;
+
+    if (remaining > 0) {
+        const loadMoreBtn = container.querySelector('.pipeline-load-more');
+        if (loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', () => {
+                pipelineDisplayLimits[containerId] = (pipelineDisplayLimits[containerId] || 10) + remaining;
+                if (lastState?.tasks) updatePipelineView(lastState.tasks);
+            });
+        }
+    }
 }
 /**
  * Update pipeline filter dropdown options from latest state
