@@ -5426,7 +5426,7 @@ if (Test-Path $rerunTaskManifest) {
             -Condition (-not $taskA.extensions.runner.PSObject.Properties['pending_question'] -and -not $taskA.extensions.runner.PSObject.Properties['skip_reason']) `
             -Message "pending_question / skip_reason should be removed"
         Assert-True -Name "Reset-WorkflowTasksToTodo: reset task still passes schema validation" `
-            -Condition ((@(Test-TaskInstance -Task $taskA)).Count -eq 0) `
+            -Condition ((Test-TaskInstance -Task $taskA).Count -eq 0) `
             -Message "reopened task must remain a valid TaskInstance"
 
         $taskD = Get-Content (Join-Path $rerunRunDir "$idD.json") -Raw | ConvertFrom-Json

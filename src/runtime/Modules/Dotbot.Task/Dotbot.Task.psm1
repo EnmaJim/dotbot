@@ -624,7 +624,7 @@ function Get-WorkflowTransitiveDependents {
     )
 
     if (-not (Test-Path -LiteralPath $RunDir)) {
-        return ,@()
+        return @()
     }
 
     # depId -> list of task IDs that declare it as a dependency.
@@ -681,7 +681,7 @@ function Get-WorkflowTransitiveDependents {
         }
     }
 
-    return ,@($result.ToArray())
+    return $result.ToArray()
 }
 
 function Reset-WorkflowTasksToTodo {
@@ -727,7 +727,7 @@ function Reset-WorkflowTasksToTodo {
     $resetTasks = @()
 
     if (-not (Test-Path -LiteralPath $RunDir)) {
-        return ,$resetTasks
+        return $resetTasks
     }
 
     $targetSet = [System.Collections.Generic.HashSet[string]]::new()
@@ -771,7 +771,7 @@ function Reset-WorkflowTasksToTodo {
         }
     }
 
-    return ,$resetTasks
+    return $resetTasks
 }
 
 function Get-NeedsInputTasksInScope {
