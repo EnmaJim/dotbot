@@ -200,6 +200,21 @@ Assert-True -Name "Task-runner no longer carries a bespoke barrier switch case" 
     -Condition ($workflowProcessContent -notmatch "'barrier'\s*\{") `
     -Message "Barrier should be handled by the shipped barrier executor"
 
+# #515: the MCP preflight must run against the main project root, not the
+# worktree path, because the worktree's .control junction can be stale on
+# task retry and would make the preflight MCP process exit before handshake.
+Assert-True -Name "Test-DotbotMcpReadiness accepts a ProjectRoot override" `
+    -Condition ($workflowProcessContent -match '(?s)function Test-DotbotMcpReadiness.*?\[string\]\$ProjectRoot') `
+    -Message "Test-DotbotMcpReadiness should expose an optional `$ProjectRoot parameter (#515)"
+
+Assert-True -Name "MCP preflight prefers ProjectRoot over worktree for DOTBOT_PROJECT_ROOT" `
+    -Condition ($workflowProcessContent -match "DOTBOT_PROJECT_ROOT'\]\s*=\s*if\s*\(\`$ProjectRoot\)\s*\{\s*\`$ProjectRoot\s*\}\s*else\s*\{\s*\`$WorktreePath\s*\}") `
+    -Message "Preflight should set DOTBOT_PROJECT_ROOT to `$ProjectRoot when supplied, falling back to `$WorktreePath (#515)"
+
+Assert-True -Name "Preflight call site passes the main project root" `
+    -Condition ($workflowProcessContent -match 'Test-DotbotMcpReadiness\s+-WorktreePath\s+\$worktreePath\s+-ProjectRoot\s+\$projectRoot') `
+    -Message "Test-DotbotMcpReadiness call site should pass -ProjectRoot `$projectRoot (#515)"
+
 $enterDoneHook = Join-Path $runtimeDir "Plugins/Hooks/Transitions/enter-done/script.ps1"
 $enterDoneContent = Get-Content $enterDoneHook -Raw
 Assert-True -Name "enter-done hook imports Dotbot.Content from DOTBOT_HOME" `

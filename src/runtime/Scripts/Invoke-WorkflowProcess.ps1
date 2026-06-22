@@ -490,6 +490,13 @@ function Read-DotbotMcpPreflightLine {
 function Test-DotbotMcpReadiness {
     param(
         [Parameter(Mandatory)] [string]$WorktreePath,
+        # Optional override for DOTBOT_PROJECT_ROOT. The worktree's .control
+        # junction can be stale on task retry (teardown/re-create is not
+        # atomic), which makes the standalone preflight MCP process exit before
+        # the handshake. Passing the main project root — which always has a
+        # stable .control/ — keeps runtime.json resolution working. Falls back
+        # to $WorktreePath when omitted (backward compatible). See #515.
+        [string]$ProjectRoot,
         [string[]]$RequiredTools = @('task_get_context','task_set_status','task_update','decision_create','decision_list')
     )
 
@@ -538,7 +545,7 @@ function Test-DotbotMcpReadiness {
         $psi.StandardErrorEncoding = [System.Text.Encoding]::UTF8
         $psi.WorkingDirectory = $WorktreePath
         $psi.Environment['DOTBOT_HOME'] = $frameworkRoot
-        $psi.Environment['DOTBOT_PROJECT_ROOT'] = $WorktreePath
+        $psi.Environment['DOTBOT_PROJECT_ROOT'] = if ($ProjectRoot) { $ProjectRoot } else { $WorktreePath }
         $psi.Environment['__DOTBOT_MANAGED'] = '1'
 
         $maxAttempts = 2
@@ -1710,7 +1717,7 @@ try {
         }
 
         Write-Status "Checking dotbot MCP tools..." -Type Process
-        $mcpReady = Test-DotbotMcpReadiness -WorktreePath $worktreePath
+        $mcpReady = Test-DotbotMcpReadiness -WorktreePath $worktreePath -ProjectRoot $projectRoot
         if (-not $mcpReady.ok) {
             throw "dotbot MCP preflight failed ($($mcpReady.reason)): $($mcpReady.message)"
         }
