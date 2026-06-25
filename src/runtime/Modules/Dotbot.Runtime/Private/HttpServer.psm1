@@ -38,6 +38,7 @@ function _New-RouteTable {
         @{ method = 'GET';   pattern = '^/tasks/(?<id>t_[A-Za-z0-9]{8})$';                     handler = 'Invoke-GetTaskHandler' }
         @{ method = 'PATCH'; pattern = '^/tasks/(?<id>t_[A-Za-z0-9]{8})$';                     handler = 'Invoke-PatchTaskHandler' }
         @{ method = 'POST';  pattern = '^/tasks/(?<id>t_[A-Za-z0-9]{8})/status$';              handler = 'Invoke-TaskStatusHandler' }
+        @{ method = 'POST';  pattern = '^/tasks/(?<id>t_[A-Za-z0-9]{8})/evidence$';            handler = 'Invoke-AppendTaskEvidenceHandler' }
         @{ method = 'GET';   pattern = '^/tasks/(?<id>t_[A-Za-z0-9]{8})/context$';             handler = 'Invoke-GetTaskContextHandler' }
         @{ method = 'GET';   pattern = '^/tasks$';                                             handler = 'Invoke-ListTasksHandler' }
 
@@ -1388,6 +1389,124 @@ function Invoke-GetNextTaskHandler {
     _Send-JsonResponse -Response $Response -Status 200 -Body @{ task = $next }
 }
 
+function Invoke-AppendTaskEvidenceHandler {
+    <#
+    .SYNOPSIS
+    Append evidence (an inline note and/or file attachments) to a task WITHOUT
+    changing its status. Backs the `task_append_evidence` MCP tool (#503).
+
+    .DESCRIPTION
+    Evidence is recorded as an entry appended to extensions.evidence (an open
+    namespace) and any file attachments are decoded and written under
+    workspace/attachments/<taskId>/evidence/<evidenceId>/ — deliberately
+    decoupled from the needs-input question/answer flow. The task status is
+    never touched, so the receiving task does not park and can pick up the new
+    evidence on its next task_get_context poll. extensions.runner (the answer/
+    inbox flow) is left untouched.
+    #>
+    [CmdletBinding()] param($BotRoot, $Response, $Request, $RouteParams, $Query, $Body)
+
+    $taskId = $RouteParams['id']
+    if (-not $Body) {
+        _Send-ErrorResponse -Response $Response -Status 400 -Code 'missing_body' -Message 'POST /tasks/<id>/evidence requires a JSON body.'
+        return
+    }
+    $label = if ($Body.PSObject.Properties['label']) { [string]$Body.label } else { '' }
+    if ([string]::IsNullOrWhiteSpace($label)) {
+        _Send-ErrorResponse -Response $Response -Status 400 -Code 'missing_field' -Message 'label is required.'
+        return
+    }
+    $note = if ($Body.PSObject.Properties['note']) { [string]$Body.note } else { $null }
+    $hasAttachments = $Body.PSObject.Properties['attachments'] -and @($Body.attachments).Count -gt 0
+    if ([string]::IsNullOrWhiteSpace($note) -and -not $hasAttachments) {
+        _Send-ErrorResponse -Response $Response -Status 400 -Code 'missing_field' -Message 'Provide at least one of: note, attachments.'
+        return
+    }
+    $actor = if ($Body.PSObject.Properties['actor']) { [string]$Body.actor } else { 'system' }
+    $evidenceType = if ($Body.PSObject.Properties['evidence_type']) { [string]$Body.evidence_type } else { $null }
+
+    $evidenceId = "ev_$([guid]::NewGuid().ToString('N').Substring(0,8))"
+
+    Lock-TaskMutex -TaskId $taskId | Out-Null
+    try {
+        $path = _Find-TaskFileById -BotRoot $BotRoot -TaskId $taskId
+        if (-not $path) {
+            _Send-ErrorResponse -Response $Response -Status 404 -Code 'not_found' -Message "Task $taskId not found."
+            return
+        }
+        $task = _Read-TaskFile -Path $path
+
+        # Decode + persist any file attachments under the attachments root, in an
+        # evidence/<evidenceId>/ subtree (decoupled from the needs-input flow).
+        $attachmentMeta = @()
+        if ($hasAttachments) {
+            $allowedExtensions = @('.md', '.docx', '.xlsx', '.pdf', '.txt')
+            $evidenceDir = Join-Path $BotRoot "workspace/attachments/$taskId/evidence/$evidenceId"
+            foreach ($att in @($Body.attachments)) {
+                $safeName = [System.IO.Path]::GetFileName([string]$att.name)
+                if ([string]::IsNullOrWhiteSpace($safeName)) { continue }
+                $ext = [System.IO.Path]::GetExtension($safeName).ToLowerInvariant()
+                if ($ext -notin $allowedExtensions) {
+                    _Send-ErrorResponse -Response $Response -Status 400 -Code 'unsupported_attachment' -Message "Attachment '$safeName' has unsupported extension '$ext' (allowed: $($allowedExtensions -join ', '))."
+                    return
+                }
+                try {
+                    $bytes = [System.Convert]::FromBase64String([string]$att.content)
+                } catch {
+                    _Send-ErrorResponse -Response $Response -Status 400 -Code 'invalid_attachment' -Message "Attachment '$safeName' content is not valid base64."
+                    return
+                }
+                if (-not (Test-Path -LiteralPath $evidenceDir)) {
+                    New-Item -ItemType Directory -Force -Path $evidenceDir | Out-Null
+                }
+                [System.IO.File]::WriteAllBytes((Join-Path $evidenceDir $safeName), $bytes)
+                $size = if ($att.PSObject.Properties['size'] -and $att.size) { [int]$att.size } else { $bytes.Length }
+                $attachmentMeta += @{
+                    name = $safeName
+                    size = $size
+                    path = ".bot/workspace/attachments/$taskId/evidence/$evidenceId/$safeName"
+                }
+            }
+        }
+
+        # Append the evidence entry. extensions is an open namespace; we never
+        # touch extensions.runner (the answer/inbox flow) or the task status.
+        if (-not $task.ContainsKey('extensions') -or -not $task['extensions']) {
+            $task['extensions'] = @{}
+        }
+        $ext = $task['extensions']
+        $existing = @()
+        if ($ext.ContainsKey('evidence') -and $ext['evidence']) { $existing = @($ext['evidence']) }
+        $entry = [ordered]@{
+            id            = $evidenceId
+            label         = $label
+            evidence_type = $evidenceType
+            note          = $note
+            attachments   = $attachmentMeta
+            added_at      = _Now-Utc
+            added_by      = $actor
+        }
+        $ext['evidence'] = @($existing + $entry)
+
+        $task['updated_at'] = _Now-Utc
+        $task['updated_by'] = $actor
+
+        try {
+            Assert-TaskInstance -Task $task
+        } catch {
+            _Send-ErrorResponse -Response $Response -Status 400 -Code 'schema_error' -Message $_.Exception.Message
+            return
+        }
+
+        _Write-TaskFileAtomic -Path $path -Content $task
+        Write-ActivityEvent -BotRoot $BotRoot -Type 'task_updated' -TaskId $taskId -Actor $actor -Reason 'evidence appended'
+    } finally {
+        Unlock-TaskMutex -TaskId $taskId
+    }
+
+    _Send-JsonResponse -Response $Response -Status 200 -Body @{ success = $true; evidence_id = $evidenceId; task = $task }
+}
+
 function Invoke-GetTaskContextHandler {
     [CmdletBinding()] param($BotRoot, $Response, $Request, $RouteParams, $Query, $Body)
 
@@ -1401,11 +1520,13 @@ function Invoke-GetTaskContextHandler {
 
     $runner = $null
     $analysis = $null
+    $evidence = $null
     if ($task.ContainsKey('extensions') -and $task['extensions']) {
         $extensions = $task['extensions']
         if ($extensions -is [System.Collections.IDictionary]) {
             if ($extensions.Contains('runner')) { $runner = $extensions['runner'] }
             if ($extensions.Contains('analysis')) { $analysis = $extensions['analysis'] }
+            if ($extensions.Contains('evidence')) { $evidence = $extensions['evidence'] }
         }
     }
 
@@ -1424,6 +1545,7 @@ function Invoke-GetTaskContextHandler {
         session_policy    = 'single_unblocked_attempt'
         has_analysis      = ($null -ne $analysis)
         analysis          = $analysis
+        evidence          = $evidence
         active_attempt_id = if ($runner -and $runner.Contains('active_attempt_id')) { $runner['active_attempt_id'] } else { $null }
         current_handoff   = if ($runner -and $runner.Contains('current_handoff')) { $runner['current_handoff'] } else { $null }
         resume_context    = $resumeContext

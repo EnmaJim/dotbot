@@ -44,6 +44,7 @@ $NewTools = @(
     @{ folder = 'task-set-status';  name = 'task_set_status';  func = 'Invoke-TaskSetStatus' }
     @{ folder = 'task-get-next';    name = 'task_get_next';    func = 'Invoke-TaskGetNext' }
     @{ folder = 'task-get-context'; name = 'task_get_context'; func = 'Invoke-TaskGetContext' }
+    @{ folder = 'task-append-evidence'; name = 'task_append_evidence'; func = 'Invoke-TaskAppendEvidence' }
     @{ folder = 'workflow-start';   name = 'workflow_start';   func = 'Invoke-WorkflowStart' }
     @{ folder = 'workflow-get';     name = 'workflow_get';     func = 'Invoke-WorkflowGet' }
     @{ folder = 'workflow-list';    name = 'workflow_list';    func = 'Invoke-WorkflowList' }
@@ -403,6 +404,32 @@ try {
         -Expected 'ready' -Actual $r.body.reason
     Assert-Equal -Name "task_set_status: body.actor" `
         -Expected 'mcp:test-session-42' -Actual $r.body.actor
+
+    # ------------------------------------------------------------------------
+    # task_append_evidence — POST /tasks/<id>/evidence (no status change)
+    # ------------------------------------------------------------------------
+    $fake.next_response = @{ status = 200; body = @{ success = $true; evidence_id = 'ev_abcd1234'; task = @{ id = 't_abcd1234' } } }
+    $null = Invoke-TaskAppendEvidence -Arguments @{
+        task_id = 't_abcd1234'
+        label = 'API findings'
+        evidence_type = 'analysis'
+        note = 'The endpoint returns 200 on success.'
+        attachments = @(@{ name = 'finding.md'; size = 12; content = 'aGVsbG8gd29ybGQ=' })
+    }
+    $r = $fake.last_request
+    Assert-Equal -Name "task_append_evidence: method POST" -Expected 'POST' -Actual $r.method
+    Assert-Equal -Name "task_append_evidence: path /tasks/<id>/evidence" `
+        -Expected '/tasks/t_abcd1234/evidence' -Actual $r.path
+    Assert-Equal -Name "task_append_evidence: body.actor" `
+        -Expected 'mcp:test-session-42' -Actual $r.body.actor
+    Assert-Equal -Name "task_append_evidence: body.label" -Expected 'API findings' -Actual $r.body.label
+    Assert-Equal -Name "task_append_evidence: body.note forwarded" `
+        -Expected 'The endpoint returns 200 on success.' -Actual $r.body.note
+    Assert-Equal -Name "task_append_evidence: attachment name forwarded" `
+        -Expected 'finding.md' -Actual $r.body.attachments[0].name
+    Assert-True  -Name "task_append_evidence: no task_id in body" `
+        -Condition (-not ($r.body.PSObject.Properties.Name -contains 'task_id')) `
+        -Message "task_id belongs in the path, not the body"
 
     # ------------------------------------------------------------------------
     # task_get_next — GET /tasks/next with optional status query

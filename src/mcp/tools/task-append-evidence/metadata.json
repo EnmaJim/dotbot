@@ -1,0 +1,40 @@
+{
+  "name": "task_append_evidence",
+  "description": "Attach structured evidence (an inline note and/or file artifacts) to any queued or in-flight task WITHOUT changing its status, so the task can re-poll its context via task_get_context and incorporate the new context without pausing. Decoupled from the needs-input question/answer flow; evidence is recorded under extensions.evidence and never touches extensions.runner. POST /tasks/<id>/evidence.",
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "task_id": {
+        "type": "string",
+        "description": "Canonical task ID (t_XXXXXXXX) to attach evidence to."
+      },
+      "label": {
+        "type": "string",
+        "description": "Short human-readable label for this evidence batch."
+      },
+      "evidence_type": {
+        "type": "string",
+        "description": "Optional semantic category, e.g. 'analysis', 'log', 'screenshot', 'reference', 'other'."
+      },
+      "note": {
+        "type": "string",
+        "description": "Optional inline evidence content (text or markdown). Provide a note and/or attachments."
+      },
+      "attachments": {
+        "type": "array",
+        "description": "Optional file artifacts. Allowed extensions: .md, .docx, .xlsx, .pdf, .txt.",
+        "items": {
+          "type": "object",
+          "required": ["name", "content"],
+          "properties": {
+            "name": { "type": "string", "description": "Filename with extension." },
+            "size": { "type": "integer", "description": "Byte size (optional; computed from content when omitted)." },
+            "content": { "type": "string", "description": "Base64-encoded file content." }
+          }
+        }
+      }
+    },
+    "required": ["task_id", "label"]
+  }
+}

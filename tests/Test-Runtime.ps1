@@ -440,6 +440,44 @@ try {
     Assert-Equal -Name "GET /tasks/<id>/context: session policy" -Expected 'single_unblocked_attempt' -Actual $r.body.session_policy
     Assert-True  -Name "GET /tasks/<id>/context: resume context present in envelope" -Condition ($null -ne $r.body.PSObject.Properties['resume_context'])
 
+    $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path "/tasks/$newTaskId/evidence" -Token $start.token -Body @{
+        label = 'first finding'; evidence_type = 'analysis'
+        note = 'Endpoint returns 200 on success.'
+        attachments = @(@{ name = 'finding.md'; content = 'aGVsbG8='; size = 5 })
+        actor = 'mcp:test'
+    }
+    Assert-Equal -Name "POST /tasks/<id>/evidence → 200" -Expected 200 -Actual $r.status_code
+    Assert-True  -Name "evidence: response success"        -Condition ($r.body.success -eq $true)
+    Assert-True  -Name "evidence: response carries ev_ id"  -Condition ($r.body.evidence_id -cmatch '^ev_[A-Za-z0-9]{8}$')
+    Assert-Equal -Name "evidence: status unchanged (in-progress, not parked)" -Expected 'in-progress' -Actual $r.body.task.status
+    Assert-Equal -Name "evidence: one entry recorded"       -Expected 1 -Actual @($r.body.task.extensions.evidence).Count
+    Assert-Equal -Name "evidence: entry label persisted"    -Expected 'first finding' -Actual $r.body.task.extensions.evidence[0].label
+    Assert-Equal -Name "evidence: attachment name recorded" -Expected 'finding.md' -Actual $r.body.task.extensions.evidence[0].attachments[0].name
+
+    $evAbs = Join-Path (Split-Path -Parent $bot) $r.body.task.extensions.evidence[0].attachments[0].path
+    Assert-True  -Name "evidence: attachment file written to disk" -Condition (Test-Path -LiteralPath $evAbs)
+
+    $r = Invoke-RuntimeRaw -Url $start.url -Method GET -Path "/tasks/$newTaskId/context" -Token $start.token
+    Assert-Equal -Name "evidence: context re-poll → 200" -Expected 200 -Actual $r.status_code
+    Assert-Equal -Name "evidence: context envelope surfaces evidence" -Expected 'first finding' -Actual $r.body.evidence[0].label
+    Assert-Equal -Name "evidence: context task still in-progress" -Expected 'in-progress' -Actual $r.body.task.status
+    Assert-True  -Name "evidence: AC#3 runner untouched (no pending_question)" -Condition ($null -eq $r.body.task.extensions.runner.pending_question)
+
+    $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path "/tasks/$newTaskId/evidence" -Token $start.token -Body @{
+        label = 'second finding'; note = 'More context.'; actor = 'mcp:test'
+    }
+    Assert-Equal -Name "evidence: second append → 200" -Expected 200 -Actual $r.status_code
+    Assert-Equal -Name "evidence: array grew to 2 (append, not replace)" -Expected 2 -Actual @($r.body.task.extensions.evidence).Count
+
+    $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path "/tasks/$newTaskId/evidence" -Token $start.token -Body @{ note = 'no label' }
+    Assert-Equal -Name "evidence: missing label → 400" -Expected 400 -Actual $r.status_code
+    $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path "/tasks/$newTaskId/evidence" -Token $start.token -Body @{ label = 'empty' }
+    Assert-Equal -Name "evidence: no note and no attachments → 400" -Expected 400 -Actual $r.status_code
+    $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path "/tasks/$newTaskId/evidence" -Token $start.token -Body @{ label = 'bad'; attachments = @(@{ name = 'x.exe'; content = 'AAAA' }) }
+    Assert-Equal -Name "evidence: unsupported attachment extension → 400" -Expected 400 -Actual $r.status_code
+    $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path '/tasks/t_99999999/evidence' -Token $start.token -Body @{ label = 'x'; note = 'y' }
+    Assert-Equal -Name "evidence: append to missing task → 404" -Expected 404 -Actual $r.status_code
+
     # POST /tasks/<id>/status — active task can be intentionally skipped after discovery.
     $r = Invoke-RuntimeRaw -Url $start.url -Method POST -Path '/tasks' -Token $start.token -Body @{
         name = 'skip after discovery'; actor = 'test:ci'
