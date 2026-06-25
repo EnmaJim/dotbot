@@ -998,6 +998,10 @@ function Invoke-CreateTaskHandler {
         $vals = @($Body.outputs | Where-Object { $_ -and $_ -ne '' })
         if ($vals.Count -gt 0) { $params['Outputs'] = [string[]]$vals }
     }
+    if ($Body.PSObject.Properties['inputs']) {
+        $vals = @($Body.inputs | Where-Object { $_ -and $_ -ne '' })
+        if ($vals.Count -gt 0) { $params['Inputs'] = [string[]]$vals }
+    }
     if ($Body.PSObject.Properties['provenance']) {
         # Convert PSCustomObject → hashtable for the builder.
         $bag = @{}
@@ -1107,7 +1111,7 @@ function Invoke-PatchTaskHandler {
         $forbidden = @('id', 'status', 'schema_version', 'created_at', 'completed_at')
         # Single-string values for list-shaped fields are coerced to a
         # one-element array so the schema assert downstream accepts them.
-        $listFields = @('dependencies', 'acceptance_criteria', 'outputs')
+        $listFields = @('dependencies', 'acceptance_criteria', 'outputs', 'inputs')
         foreach ($prop in $Body.PSObject.Properties) {
             if ($prop.Name -in @('actor')) { continue }
             if ($prop.Name -in $forbidden) {

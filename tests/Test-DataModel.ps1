@@ -540,6 +540,14 @@ $errs = Test-TaskDefinition -TaskDef $badDeps
 Assert-True -Name "TaskDefinition: depends_on as a single string is rejected" `
     -Condition (($errs | Where-Object { $_ -match 'depends_on' }).Count -gt 0)
 
+$goodInputs = @{ name = 'X'; type = 'prompt'; inputs = @('briefing/repo-scan.md', 'mission.md') }
+Assert-Equal -Name "TaskDefinition: inputs as array of strings → 0 errors" `
+    -Expected 0 -Actual (Test-TaskDefinition -TaskDef $goodInputs).Count
+$badInputs = @{ name = 'X'; type = 'prompt'; inputs = 'a-single-string' }
+$errs = Test-TaskDefinition -TaskDef $badInputs
+Assert-True -Name "TaskDefinition: inputs as a single string is rejected" `
+    -Condition (($errs | Where-Object { $_ -match 'inputs' }).Count -gt 0)
+
 # Removed-fields list exposed
 $removed = Get-TaskDefinitionRemovedFields
 foreach ($f in 'skip_worktree','working_dir','external_repo','commit','front_matter_docs','post_script') {

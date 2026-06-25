@@ -383,6 +383,7 @@ function _FlattenTask {
         description           = $Content.description
         dependencies          = $Content.dependencies
         outputs               = $Content.outputs
+        inputs                = $Content.inputs
         acceptance_criteria   = $Content.acceptance_criteria
         created_at            = $Content.created_at
         updated_at            = $Content.updated_at

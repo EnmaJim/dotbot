@@ -8,6 +8,7 @@ TaskDefinition shape (a single entry in workflow.json's `tasks` array):
   - depends_on     : array of strings (other TaskDefinition names), optional
   - prompt         : string (path or inline text), optional
   - outputs        : array of strings, optional
+  - inputs         : array of strings, optional
   - priority       : int or named (low/normal/high/critical), optional
   - optional       : bool, optional (default false)
 
@@ -16,7 +17,7 @@ front_matter_docs, post_script. (post_script is a transition-hook concern.)
 #>
 
 $script:DotbotTaskDefFields = @(
-    'name', 'type', 'depends_on', 'prompt', 'outputs', 'priority', 'optional'
+    'name', 'type', 'depends_on', 'prompt', 'outputs', 'inputs', 'priority', 'optional'
 )
 
 # Fields that legacy manifests may still carry; explicitly rejected so a
@@ -150,6 +151,28 @@ function Test-TaskDefinition {
                 foreach ($o in @($outsRaw)) {
                     if ($o -isnot [string]) {
                         [void]$errors.Add("outputs[$i]: must be a string")
+                    }
+                    $i++
+                }
+            }
+        }
+    }
+
+    # inputs — array of strings.
+    if (_Has-Prop $TaskDef 'inputs') {
+        if ($TaskDef -is [System.Collections.IDictionary]) {
+            $insRaw = $TaskDef['inputs']
+        } else {
+            $insRaw = $TaskDef.inputs
+        }
+        if ($null -ne $insRaw) {
+            if ($insRaw -is [string]) {
+                [void]$errors.Add('inputs: must be an array of strings, not a single string')
+            } else {
+                $i = 0
+                foreach ($inp in @($insRaw)) {
+                    if ($inp -isnot [string]) {
+                        [void]$errors.Add("inputs[$i]: must be a string")
                     }
                     $i++
                 }

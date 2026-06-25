@@ -1050,6 +1050,9 @@ function New-WorkflowTask {
     $outputs = @()
     if ($TaskDef['outputs']) { $outputs = @($TaskDef['outputs'] | Where-Object { $_ -and $_ -ne '' }) }
 
+    $inputs = @()
+    if ($TaskDef['inputs']) { $inputs = @($TaskDef['inputs'] | Where-Object { $_ -and $_ -ne '' }) }
+
     $acceptance = @()
     if ($TaskDef['acceptance_criteria']) { $acceptance = @($TaskDef['acceptance_criteria'] | Where-Object { $_ -and $_ -ne '' }) }
 
@@ -1069,6 +1072,7 @@ function New-WorkflowTask {
         -Dependencies ([string[]]$deps) `
         -AcceptanceCriteria ([string[]]$acceptance) `
         -Outputs ([string[]]$outputs) `
+        -Inputs ([string[]]$inputs) `
         -Provenance @{
             workflow        = $workflowName
             run_id          = $runId

@@ -5404,6 +5404,85 @@ if (Test-Path $workflowProcessScript) {
     Write-TestResult -Name "Test-TaskIsMandatory tests" -Status Skip -Message "Invoke-WorkflowProcess.ps1 not found"
 }
 
+if (Test-Path $workflowProcessScript) {
+    $artAst = [System.Management.Automation.Language.Parser]::ParseFile($workflowProcessScript, [ref]$null, [ref]$null)
+    $wanted = @('Test-DotbotArtifact', 'Test-TaskInput', 'Test-TaskOutput')
+    $found = @{}
+    foreach ($fn in $artAst.FindAll({
+        $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $wanted -contains $args[0].Name
+    }, $false)) {
+        $found[$fn.Name] = $fn.Extent.Text
+    }
+
+    if ($found.Count -eq $wanted.Count) {
+        foreach ($fn in $wanted) { Invoke-Expression $found[$fn] }
+
+        $artTmp = Join-Path ([System.IO.Path]::GetTempPath()) "dotbot-artifact-test-$(Get-Random)"
+        $artProductDir = Join-Path $artTmp "workspace/product"
+        New-Item -Path $artProductDir -ItemType Directory -Force | Out-Null
+        try {
+            # --- Test-DotbotArtifact ---
+            Assert-True -Name "Test-DotbotArtifact: absent file → 'absent'" `
+                -Condition ((Test-DotbotArtifact -Path (Join-Path $artProductDir 'nope.md')) -eq 'absent')
+
+            $emptyFile = Join-Path $artProductDir 'empty.md'
+            Set-Content -Path $emptyFile -Value "   `n  " -Encoding UTF8 -NoNewline
+            Assert-True -Name "Test-DotbotArtifact: whitespace-only → 'empty'" `
+                -Condition ((Test-DotbotArtifact -Path $emptyFile) -eq 'empty')
+
+            $badJson = Join-Path $artProductDir 'bad.json'
+            Set-Content -Path $badJson -Value '{ "a": 1, ' -Encoding UTF8
+            Assert-True -Name "Test-DotbotArtifact: truncated .json → malformed" `
+                -Condition ((Test-DotbotArtifact -Path $badJson) -match 'malformed')
+
+            $goodJson = Join-Path $artProductDir 'good.json'
+            Set-Content -Path $goodJson -Value '{ "a": 1 }' -Encoding UTF8
+            Assert-True -Name "Test-DotbotArtifact: valid .json → null" `
+                -Condition ($null -eq (Test-DotbotArtifact -Path $goodJson))
+
+            $goodMd = Join-Path $artProductDir 'good.md'
+            Set-Content -Path $goodMd -Value "# Heading`nbody" -Encoding UTF8
+            Assert-True -Name "Test-DotbotArtifact: non-empty .md → null" `
+                -Condition ($null -eq (Test-DotbotArtifact -Path $goodMd))
+
+            # --- Test-TaskInput (consumer-entry gate) ---
+            $taskNoInputs = @{ id = 't_aaaaaaaa'; name = 'no-inputs' }
+            Assert-True -Name "Test-TaskInput: no inputs declared → null (unaffected)" `
+                -Condition ($null -eq (Test-TaskInput -Task $taskNoInputs -ProductDir $artProductDir))
+
+            $taskGoodInputs = @{ id = 't_bbbbbbbb'; name = 'good-inputs'; inputs = @('good.md', 'good.json') }
+            Assert-True -Name "Test-TaskInput: all inputs present → null" `
+                -Condition ($null -eq (Test-TaskInput -Task $taskGoodInputs -ProductDir $artProductDir))
+
+            $taskMissingInput = @{ id = 't_cccccccc'; name = 'missing-input'; inputs = @('good.md', 'gone.md') }
+            $missErr = Test-TaskInput -Task $taskMissingInput -ProductDir $artProductDir
+            Assert-True -Name "Test-TaskInput: missing input → actionable error naming the artifact" `
+                -Condition ($missErr -match "gone\.md" -and $missErr -match 'absent')
+
+            $taskEmptyInput = @{ id = 't_dddddddd'; name = 'empty-input'; inputs = @('empty.md') }
+            Assert-True -Name "Test-TaskInput: empty input → 'empty' error" `
+                -Condition ((Test-TaskInput -Task $taskEmptyInput -ProductDir $artProductDir) -match 'empty')
+
+            # --- Test-TaskOutput upgrade: empty declared output now fails (AC#1) ---
+            $taskEmptyOutput = @{ id = 't_eeeeeeee'; name = 'empty-output'; outputs = @('empty.md') }
+            Assert-True -Name "Test-TaskOutput: declared output exists but empty → fails" `
+                -Condition ((Test-TaskOutput -Task $taskEmptyOutput -BotRoot $artTmp -ProductDir $artProductDir) -match 'empty\.md')
+
+            $taskGoodOutput = @{ id = 't_ffffffff'; name = 'good-output'; outputs = @('good.md') }
+            Assert-True -Name "Test-TaskOutput: declared output present + non-empty → passes" `
+                -Condition ($null -eq (Test-TaskOutput -Task $taskGoodOutput -BotRoot $artTmp -ProductDir $artProductDir))
+        } finally {
+            if (Test-Path $artTmp) { Remove-Item $artTmp -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+    } else {
+        Write-TestResult -Name "Artifact contract gate function extraction" -Status Fail `
+            -Message "Expected $($wanted -join ', ') in $workflowProcessScript; found $($found.Keys -join ', ')"
+    }
+} else {
+    Write-TestResult -Name "Artifact contract gate tests" -Status Skip -Message "Invoke-WorkflowProcess.ps1 not found"
+}
+
 # New-WorkflowTask: tasks land under workflow-runs/<dir>/t_<id>.json with
 # 'optional' under extensions.workflow (closed schema keeps the top level
 # constrained). Initialize-WorkflowRun mints the run first.
@@ -5436,6 +5515,20 @@ if (Test-Path $workflowManifestScript) {
         Assert-True -Name "New-WorkflowTask: optional absent when not declared" `
             -Condition (-not $hasOptional) `
             -Message "optional should not be present when not declared"
+
+        $inputsTask = @{ name = 'consumer-step'; type = 'prompt'; inputs = @('briefing/repo-scan.md', 'mission.md') }
+        $r3 = New-WorkflowTask -Run $run -TaskDef $inputsTask
+        $taskJson3 = Get-Content -Path $r3.file_path -Raw | ConvertFrom-Json
+        Assert-True -Name "New-WorkflowTask: inputs lands as a top-level array" `
+            -Condition (@($taskJson3.inputs).Count -eq 2 -and $taskJson3.inputs -contains 'mission.md') `
+            -Message "inputs should survive onto the task record at the top level"
+
+        $noInputsTask = @{ name = 'no-input-step'; type = 'prompt' }
+        $r4 = New-WorkflowTask -Run $run -TaskDef $noInputsTask
+        $taskJson4 = Get-Content -Path $r4.file_path -Raw | ConvertFrom-Json
+        Assert-True -Name "New-WorkflowTask: inputs defaults to empty array when not declared" `
+            -Condition (@($taskJson4.inputs).Count -eq 0) `
+            -Message "inputs should be an empty array (not absent) when not declared"
     } catch {
         Write-TestResult -Name "New-WorkflowTask optional propagation" -Status Fail -Message $_.Exception.Message
     } finally {

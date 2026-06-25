@@ -1495,6 +1495,16 @@ Assert-True -Name "Invoke-WorkflowProcess defines Add-TaskFrontMatter helper" `
 $outputCallCount = ([regex]::Matches($workflowSrc, 'Test-TaskOutput\s+(-Task|@\w)')).Count
 Assert-True -Name "Test-TaskOutput called from both task paths (>=2 sites)" `
     -Condition ($outputCallCount -ge 2)
+
+Assert-True -Name "Invoke-WorkflowProcess defines Test-DotbotArtifact helper" `
+    -Condition ($workflowSrc -match 'function\s+Test-DotbotArtifact\b')
+Assert-True -Name "Invoke-WorkflowProcess defines Test-TaskInput helper" `
+    -Condition ($workflowSrc -match 'function\s+Test-TaskInput\b')
+$inputCallCount = ([regex]::Matches($workflowSrc, 'Test-TaskInput\s+(-Task|@\w)')).Count
+Assert-True -Name "Test-TaskInput called from both task paths (>=2 sites)" `
+    -Condition ($inputCallCount -ge 2)
+Assert-True -Name "Input gate escalates via Set-WorkflowTaskNeedsInput (input-missing question)" `
+    -Condition ($workflowSrc -match 'input-missing-\$\(\$task\.id\)')
 $frontMatterCallCount = ([regex]::Matches($workflowSrc, 'Add-TaskFrontMatter\s+(-Task|@\w)')).Count
 Assert-True -Name "Add-TaskFrontMatter called from both task paths (>=2 sites)" `
     -Condition ($frontMatterCallCount -ge 2)

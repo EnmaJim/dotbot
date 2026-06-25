@@ -29,6 +29,7 @@ $script:DotbotTaskInstanceFields = @(
     'dependencies',
     'acceptance_criteria',
     'outputs',
+    'inputs',
     'created_at',
     'updated_at',
     'completed_at',
@@ -294,8 +295,8 @@ function Test-TaskInstance {
         }
     }
 
-    # acceptance_criteria / outputs — arrays of strings.
-    foreach ($listField in 'acceptance_criteria','outputs') {
+    # acceptance_criteria / outputs / inputs — arrays of strings.
+    foreach ($listField in 'acceptance_criteria','outputs','inputs') {
         if (-not (_Has-DotbotProp $Task $listField)) { continue }
         if ($Task -is [System.Collections.IDictionary]) {
             $valRaw = $Task[$listField]
@@ -416,6 +417,8 @@ function New-TaskInstance {
 
         [string[]]$Outputs = @(),
 
+        [string[]]$Inputs = @(),
+
         [hashtable]$Extensions,
 
         [string]$UpdatedBy = 'system',
@@ -461,6 +464,7 @@ function New-TaskInstance {
         dependencies        = @($Dependencies)
         acceptance_criteria = @($AcceptanceCriteria)
         outputs             = @($Outputs)
+        inputs              = @($Inputs)
         created_at          = $now
         updated_at          = $now
         completed_at        = $completedAt

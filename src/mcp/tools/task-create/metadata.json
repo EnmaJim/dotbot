@@ -68,6 +68,13 @@
           "type": "string"
         }
       },
+      "inputs": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Artifact files this task requires as input. Validated for presence, non-emptiness, and (for .json) well-formedness before the task runs; a missing/empty/malformed input blocks the task with needs-input."
+      },
       "provenance": {
         "type": "object",
         "description": "Optional provenance bag (workflow / run_id / source). Standalone tasks omit this."

@@ -681,6 +681,26 @@ function Get-TaskOutputBaseline {
     return 0
 }
 
+function Test-DotbotArtifact {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return 'absent'
+    }
+    $raw = Get-Content -LiteralPath $Path -Raw -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrWhiteSpace($raw)) {
+        return 'empty'
+    }
+    if ([System.IO.Path]::GetExtension($Path) -ieq '.json') {
+        try {
+            $null = $raw | ConvertFrom-Json -ErrorAction Stop
+        } catch {
+            return 'malformed JSON (possibly partially written)'
+        }
+    }
+    return $null
+}
+
 function Test-TaskOutput {
     param(
         [Parameter(Mandatory)]$Task,
@@ -700,8 +720,9 @@ function Test-TaskOutput {
     }
     if ($taskOutputs) {
         foreach ($f in $taskOutputs) {
-            if (-not (Test-Path (Join-Path $ProductDir $f))) {
-                return "Task output not produced: $f"
+            $reason = Test-DotbotArtifact -Path (Join-Path $ProductDir $f)
+            if ($reason) {
+                return "Task output not produced: $f ($reason)"
             }
         }
     } elseif ($taskOutputsDir) {
@@ -737,6 +758,24 @@ function Test-TaskOutput {
             }
         } elseif ($fileCount -lt $minCount) {
             return "Task output directory '$taskOutputsDir' has $fileCount file(s), expected at least $minCount"
+        }
+    }
+    return $null
+}
+
+function Test-TaskInput {
+    param(
+        [Parameter(Mandatory)]$Task,
+        [Parameter(Mandatory)][string]$ProductDir
+    )
+    $taskInputs = if ($Task -is [System.Collections.IDictionary]) { $Task['inputs'] } else { $Task.inputs }
+    if (-not $taskInputs) {
+        return $null
+    }
+    foreach ($f in $taskInputs) {
+        $reason = Test-DotbotArtifact -Path (Join-Path $ProductDir $f)
+        if ($reason) {
+            return "Required input '$f' is $reason"
         }
     }
     return $null
@@ -1485,6 +1524,38 @@ try {
             $executionBotRoot = Join-Path $worktreePath ".bot"
             $executionProductDir = Join-Path (Join-Path $executionBotRoot 'workspace') 'product'
 
+            $inputErr = Test-TaskInput -Task $task -ProductDir $executionProductDir
+            if ($inputErr) {
+                Write-Status "Input validation failed for $($task.name): $inputErr" -Type Warn
+                Write-ProcessActivity -Id $procId -ActivityType "error" -Message "Input gate failed for $($task.name): $inputErr"
+                if ($worktreePath) {
+                    try {
+                        Remove-Junctions -WorktreePath $worktreePath -ErrorOnFailure $false | Out-Null
+                        git -C $projectRoot worktree remove $worktreePath --force 2>$null
+                        if ($branchName) { git -C $projectRoot branch -D $branchName 2>$null }
+                    } finally {
+                        Invoke-WorktreeMapLocked -BotRoot $botRoot -Action {
+                            $cleanupMap = Read-WorktreeMap -BotRoot $botRoot
+                            $cleanupMap.Remove($task.id)
+                            Write-WorktreeMap -Map $cleanupMap -BotRoot $botRoot
+                        }
+                        try { Assert-OnBaseBranch -ProjectRoot $projectRoot | Out-Null } catch { Write-BotLog -Level Warn -Message "Task operation failed" -Exception $_ }
+                    }
+                }
+                try {
+                    Set-WorkflowTaskNeedsInput `
+                        -Task $task `
+                        -RunDir $runDir `
+                        -QuestionId "input-missing-$($task.id)" `
+                        -Question "Required input artifact missing for task '$($task.name)'" `
+                        -Context $inputErr | Out-Null
+                } catch { Write-BotLog -Level Warn -Message "Failed to escalate task" -Exception $_ }
+                $TaskId = $null
+                $processData.task_id = $null
+                $processData.task_name = $null
+                continue
+            }
+
             # Mark in-progress
             Set-TaskInProgressForExecutorDispatch -Task $task
 
@@ -1773,6 +1844,38 @@ try {
                     Copy-Item -LiteralPath $bf.FullName -Destination $destBriefingDir -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
+        }
+
+        $inputErr = Test-TaskInput -Task $task -ProductDir $executionProductDir
+        if ($inputErr) {
+            Write-Status "Input validation failed for $($task.name): $inputErr" -Type Warn
+            Write-ProcessActivity -Id $procId -ActivityType "error" -Message "Input gate failed for $($task.name): $inputErr"
+            if ($worktreePath) {
+                try {
+                    Remove-Junctions -WorktreePath $worktreePath -ErrorOnFailure $false | Out-Null
+                    git -C $projectRoot worktree remove $worktreePath --force 2>$null
+                    if ($branchName) { git -C $projectRoot branch -D $branchName 2>$null }
+                } finally {
+                    Invoke-WorktreeMapLocked -BotRoot $botRoot -Action {
+                        $cleanupMap = Read-WorktreeMap -BotRoot $botRoot
+                        $cleanupMap.Remove($task.id)
+                        Write-WorktreeMap -Map $cleanupMap -BotRoot $botRoot
+                    }
+                    try { Assert-OnBaseBranch -ProjectRoot $projectRoot | Out-Null } catch { Write-BotLog -Level Warn -Message "Task operation failed" -Exception $_ }
+                }
+            }
+            try {
+                Set-WorkflowTaskNeedsInput `
+                    -Task $task `
+                    -RunDir $runDir `
+                    -QuestionId "input-missing-$($task.id)" `
+                    -Question "Required input artifact missing for task '$($task.name)'" `
+                    -Context $inputErr | Out-Null
+            } catch { Write-BotLog -Level Warn -Message "Failed to escalate task" -Exception $_ }
+            $TaskId = $null
+            $processData.task_id = $null
+            $processData.task_name = $null
+            continue
         }
 
         # Use task-level model override > execution model from settings > default
